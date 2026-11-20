@@ -47,7 +47,7 @@ jobs:
             terraform -chdir=infra/envs/$env init -backend=false -input=false
             terraform -chdir=infra/envs/$env validate
           done
-          for stack in connect dashboard wrapped analytics; do
+          for stack in connect dashboard wrapped analytics concerts; do
             terraform -chdir=infra/$stack init -backend=false -input=false
             terraform -chdir=infra/$stack validate
             terraform -chdir=infra/$stack test
@@ -80,6 +80,7 @@ jobs:
       TF_ENV: ${{ vars.TF_ENV || 'dev' }}
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       TF_VAR_spotify_client_id: ${{ vars.SPOTIFY_CLIENT_ID }}
+      TF_VAR_concerts_enabled: ${{ vars.CONCERTS_ENABLED || 'false' }}
       TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
     concurrency: terraform-${{ vars.TF_ENV || 'dev' }}
     steps:
@@ -125,7 +126,7 @@ jobs:
             export TF_VAR_table_name="$(terraform -chdir=infra/envs/$TF_ENV output -raw table_name)"
             export TF_VAR_group_id="$(terraform -chdir=infra/envs/$TF_ENV output -raw group_id)"
             export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/$TF_ENV output -raw alarm_topic_arn)"
-            for stack in connect dashboard wrapped analytics; do
+            for stack in connect dashboard wrapped analytics concerts; do
               state_name="$stack"
               if [ "$stack" = "connect" ]; then state_name="spotify-connect"; fi
               terraform -chdir=infra/$stack init -input=false \
