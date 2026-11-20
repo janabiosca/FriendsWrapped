@@ -68,6 +68,10 @@ jobs:
         if: env.TF_ENV == 'dev'
         run: |
           bash scripts/build_wrapped_package.sh
+          export TF_VAR_raw_bucket_name="$(terraform -chdir=infra/envs/$TF_ENV output -raw raw_bucket)"
+          export TF_VAR_table_name="$(terraform -chdir=infra/envs/$TF_ENV output -raw table_name)"
+          export TF_VAR_group_id="$(terraform -chdir=infra/envs/$TF_ENV output -raw group_id)"
+          export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/$TF_ENV output -raw alarm_topic_arn)"
           for stack in connect dashboard wrapped; do
             state_name="$stack"
             if [ "$stack" = "connect" ]; then state_name="spotify-connect"; fi

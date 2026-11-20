@@ -13,3 +13,4 @@ supersedes the old one.
 | [004](004-tokens-outside-terraform-state.md) | Spotify tokens in Secrets Manager, written outside Terraform |
 | [005](005-academy-sandbox-vs-own-account.md) | AWS Academy for dev, own account for prod |
 | [006](006-encryption-and-accepted-findings.md) | Encryption choices and accepted security findings |
+| [007](007-history-pagination.md) | History pagination, checkpoint safety and recovery limits |

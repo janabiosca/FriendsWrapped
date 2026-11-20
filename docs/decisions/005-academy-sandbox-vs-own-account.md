@@ -1,20 +1,21 @@
 # 005 · AWS Academy for dev, own account for prod
 
-**Context.** We have an AWS Academy sandbox and access to a regular AWS account. In Academy,
+**Context.** The project currently runs in an AWS Academy sandbox. A regular AWS account is an optional future deployment. In Academy,
 IAM roles cannot be created (everything runs as `LabRole`), credentials expire with each lab
-session, and the sandbox is not meant to run unattended for weeks. Spotify keeps only the last
-50 plays, so any collection that does not run is history lost forever.
+session, and the sandbox is not meant to run unattended for weeks. Spotify returns up to 50 plays per request; available pagination does not guarantee
+unlimited recovery after interruptions.
 
-**Decision.** Two environments from the same module:
-- `dev` (Academy): `LabRole`, AWS managed encryption, destroyable. For experiments and labs.
+**Decision.** One deployed environment and one prepared configuration using the ingestion module:
+- `dev` (Academy): `LabRole`, AWS managed encryption, destroyable. Hosts the current real listening history and the MVP.
 - `prod` (own account): one least-privilege role per function, deletion protection, customer
-  managed KMS key, always on. The real history is collected here. GitHub Actions logs in with
-  OIDC (`infra/bootstrap/github-oidc`): no AWS keys stored in GitHub.
+  managed KMS key, intended for continuous operation when deployed. It has not been deployed. GitHub Actions can use
+  OIDC (`infra/bootstrap/github-oidc`): no AWS keys stored in GitHub when those roles are configured. The OIDC roles are not deployed.
 
 **Alternatives.** Everything in Academy (free, but gaps in the data and no least privilege),
 or everything in the own account (no safe place to experiment).
 
-**Consequences.** About 3 USD/month in prod. The module has two variables (`lab_role_name`,
+**Consequences.** Own-account costs have not been measured. Connection, dashboard and
+Wrapped currently have Academy-specific stacks; prod covers ingestion only. The module has two variables (`lab_role_name`,
 `customer_managed_key`) that switch between both worlds, covered by `terraform test`.
 
 ## Academy S3 read restriction

@@ -3,7 +3,7 @@
 Listening statistics and a weekly Wrapped for a group of friends, built serverless on AWS.
 
 Spotify returns at most **50 plays per request** and does not guarantee unlimited historical access. The first
-version (v0.2, *ingestion*) collects every friend's plays every hour, even when nobody has the
+version (v0.2, *ingestion*) collects connected friends' plays every five minutes while the collection services are running, even when nobody has the
 app open, with conditional writes to avoid duplicates and warnings about possible gaps. Everything else (stats, web app, Wrapped, concerts)
 is built on top of this history.
 
@@ -15,7 +15,7 @@ pending. The `prod` environment is prepared configuration for an optional own ac
 ## Architecture (v0.2)
 
 ```
-EventBridge (hourly) ─► dispatcher λ ─► SQS FIFO (1 message group per user) ─► collector λ ─► DynamoDB (plays, profiles)
+EventBridge (every 5 minutes) ─► dispatcher λ ─► SQS FIFO (1 message group per user) ─► collector λ ─► DynamoDB (plays, profiles)
                                               │ 3 failures                         │   ├─► S3 raw zone (Hive partitions)
                                               ▼                                    │   └─► Secrets Manager (refresh tokens)
                                         Dead-letter queue ─► CloudWatch alarm ─► SNS ─► email
@@ -25,8 +25,8 @@ EventBridge (hourly) ─► dispatcher λ ─► SQS FIFO (1 message group per u
 
 | Service | Role | Why this one |
 |---|---|---|
-| EventBridge | Hourly schedule | Serverless cron, nothing to keep running |
-| Lambda (dispatcher, collector) | Fan-out and collection | Runs a few seconds per hour: pay per use |
+| EventBridge | Five-minute schedule | Serverless cron, nothing to keep running |
+| Lambda (dispatcher, collector) | Fan-out and collection | Short executions on a five-minute schedule: pay per use |
 | SQS FIFO + DLQ | One task per user, retries, isolation | A failure only retries that user; FIFO groups stop two concurrent refreshes of the same token |
 | DynamoDB (on-demand, PITR) | Plays, profiles, group membership | Key-value access by user and time; conditional writes make collection idempotent |
 | S3 (raw zone) | Raw Spotify responses | Cheap durable data lake for Glue/Athena later; rebuild stats if the schema changes |
@@ -69,7 +69,7 @@ scripts/                  bootstrap_state.sh, connect_spotify.py
 Requirements: Terraform >= 1.10, AWS CLI, Python 3.12+, credentials of the target account.
 
 1. **Spotify app** (once): create it at developer.spotify.com/dashboard, add
-   `http://127.0.0.1:8888/callback` as redirect URI and the 4 friends as users.
+   `http://127.0.0.1:8888/callback` as redirect URI and the three Spotify listeners as users (observers do not need Spotify authorization).
 2. **State bucket** (once per account; the only resource outside Terraform):
    ```bash
    scripts/bootstrap_state.sh prod      # writes infra/envs/prod/backend.conf
@@ -92,7 +92,9 @@ Use `dev` the same way in the AWS Academy sandbox (`scripts/bootstrap_state.sh d
 
 ## CI/CD (GitOps)
 
-The repository is the single source of truth: infrastructure changes only through pull requests.
+GitHub Actions provides CI. AWS deployments have been performed manually; automated
+PR plans and release deployment are prepared but require AWS configuration. OIDC roles
+have not been deployed. CI success alone does not demonstrate automated deployment.
 
 - **ci.yml**, on every push and pull request: Python tests, `terraform fmt -check`,
   `terraform test` (module tests with mocked AWS), `terraform validate` of each environment,
@@ -135,9 +137,9 @@ delay the retry, and a full page of 50 new plays is flagged as a possible gap.
 
 ## Demo
 
-- Collect now instead of waiting for the hour:
-  `aws lambda invoke --function-name $(terraform -chdir=infra/envs/prod output -raw dispatcher_function) /dev/stdout`
-- Or deploy with `collect_schedule = "rate(5 minutes)"` for the day.
+- Collect now instead of waiting for the next scheduled run:
+  `aws lambda invoke --function-name $(terraform -chdir=infra/envs/dev output -raw dispatcher_function) /dev/stdout`
+- The current Academy deployment already uses `rate(5 minutes)`.
 - Failure and recovery: a broken token sends that friend's task to the dead-letter queue and
   the alarm emails us; after reconnecting, *SQS → dead-letter queue → Start DLQ redrive*.
 
@@ -151,10 +153,12 @@ delay the retry, and a full page of 50 new plays is flagged as a possible gap.
 | Confirm the SNS email | AWS requires the recipient to opt in |
 | `infra/bootstrap/github-oidc` | Needs admin rights once; afterwards CI deploys without keys |
 
-## Cost (prod, 4 users, hourly)
+## Cost
 
-About 3 USD/month: Secrets Manager 4 × 0.40, KMS key 1.00, CloudWatch alarms ~0.50.
-Lambda, DynamoDB on-demand, SQS, S3 and X-Ray stay within the free tier at this volume.
+The deployed environment is AWS Academy, subject to its lab budget and restrictions.
+An own-account deployment has not been measured. Costs depend on collection frequency,
+active services, retention, region and any applicable credits; do not treat a hypothetical
+monthly estimate as a measured project cost.
 
 ## Known limitations
 
@@ -275,3 +279,30 @@ Wrapped stacks. Academy PR plans and release deployments use separate state keys
 for each stack. PDF dependencies are built before planning or deploying the Wrapped
 function. AWS repository variables and expiring Academy credentials must be configured
 before cloud plans and deployments can run; local source publication alone runs CI.
+
+## Implementation status
+
+- Deployed: Academy ingestion, invitation-based Spotify connection, authenticated group dashboard and weekly PDF workflow. Three Spotify listeners and separate observer access.
+- Prepared only: own-account `prod` ingestion configuration, GitHub OIDC roles and automated cloud deployment. `prod` does not include dashboard, connection or Wrapped stacks.
+- Pending: monthly filter, concert discovery, Wrapped email delivery, API error/latency alarms and an explicit trace review.
+- Not implemented: Glue/Athena analytics, curated Parquet data and Bedrock summaries. Raw S3 storage is a foundation, not a completed analytics pipeline.
+
+## Parameters for Academy application stacks
+
+Resource names retain their current defaults (`sfw-dev`, `LabRole`, `friends`) so
+parameterization alone does not rename existing resources. Each application stack
+accepts `aws_region`, `name_prefix`, `lab_role_name`, `table_name` and `group_id`.
+Dashboard and Wrapped require `raw_bucket_name`; Wrapped also requires
+`alarm_topic_arn`. Supply real values locally or obtain them from ingestion outputs:
+
+```bash
+export TF_VAR_raw_bucket_name="$(terraform -chdir=infra/envs/dev output -raw raw_bucket)"
+export TF_VAR_table_name="$(terraform -chdir=infra/envs/dev output -raw table_name)"
+export TF_VAR_group_id="$(terraform -chdir=infra/envs/dev output -raw group_id)"
+export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/dev output -raw alarm_topic_arn)"
+```
+
+The new alarm output requires an ingestion apply/refresh-only apply reviewed against
+its existing state before downstream automation reads it. Inspect every cloud plan;
+never accept resource replacement merely to adopt these parameters. These source
+changes have not been applied to the live Academy deployment.

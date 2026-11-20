@@ -14,7 +14,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
   default_tags {
     tags = {
       Project   = "spotify-friends-wrapped"
@@ -24,7 +24,7 @@ provider "aws" {
 }
 
 data "aws_iam_role" "lab" {
-  name = "LabRole"
+  name = var.lab_role_name
 }
 
 data "archive_file" "wrapped" {
@@ -35,12 +35,12 @@ data "archive_file" "wrapped" {
 }
 
 resource "aws_cloudwatch_log_group" "wrapped" {
-  name              = "/aws/lambda/sfw-dev-wrapped"
+  name              = "/aws/lambda/${var.name_prefix}-wrapped"
   retention_in_days = 7
 }
 
 resource "aws_lambda_function" "wrapped" {
-  function_name    = "sfw-dev-wrapped"
+  function_name    = "${var.name_prefix}-wrapped"
   role             = data.aws_iam_role.lab.arn
   runtime          = "python3.13"
   handler          = "wrapped.handler"
@@ -50,16 +50,16 @@ resource "aws_lambda_function" "wrapped" {
   memory_size      = 256
   environment {
     variables = {
-      TABLE_NAME = "sfw-dev"
-      RAW_BUCKET = "sfw-dev-raw-6e5880d28f5d8e514bf6ee4650"
-      GROUP_ID   = "friends"
+      TABLE_NAME = var.table_name
+      RAW_BUCKET = var.raw_bucket_name
+      GROUP_ID   = var.group_id
     }
   }
   depends_on = [aws_cloudwatch_log_group.wrapped]
 }
 
 resource "aws_sfn_state_machine" "wrapped" {
-  name     = "sfw-dev-weekly-wrapped"
+  name     = "${var.name_prefix}-weekly-wrapped"
   role_arn = data.aws_iam_role.lab.arn
   type     = "STANDARD"
   definition = jsonencode({
@@ -110,7 +110,7 @@ resource "aws_sfn_state_machine" "wrapped" {
 }
 
 resource "aws_scheduler_schedule" "wrapped" {
-  name                         = "sfw-dev-weekly-wrapped"
+  name                         = "${var.name_prefix}-weekly-wrapped"
   schedule_expression          = "cron(0 9 ? * MON *)"
   schedule_expression_timezone = "Europe/Madrid"
   flexible_time_window {
@@ -128,7 +128,7 @@ resource "aws_scheduler_schedule" "wrapped" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "wrapped_failed" {
-  alarm_name          = "sfw-dev-weekly-wrapped-failed"
+  alarm_name          = "${var.name_prefix}-weekly-wrapped-failed"
   alarm_description   = "The weekly Wrapped generation failed. Review its Step Functions execution."
   namespace           = "AWS/States"
   metric_name         = "ExecutionsFailed"
@@ -139,7 +139,7 @@ resource "aws_cloudwatch_metric_alarm" "wrapped_failed" {
   threshold           = 0
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = ["arn:aws:sns:us-east-1:290679806567:sfw-dev-alarms"]
+  alarm_actions       = [var.alarm_topic_arn]
 }
 
 output "state_machine_arn" {
