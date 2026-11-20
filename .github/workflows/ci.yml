@@ -133,6 +133,9 @@ jobs:
                 -backend-config="key=dev/$state_name.tfstate" \
                 -backend-config="region=$AWS_REGION" \
                 -backend-config="use_lockfile=true" -backend-config="encrypt=true"
+              if [ "$stack" = "wrapped" ]; then
+                export TF_VAR_dashboard_url="$(terraform -chdir=infra/dashboard output -raw dashboard_url)"
+              fi
               terraform -chdir=infra/$stack plan -no-color -input=false -lock-timeout=60s | tee -a plan.txt
             done
           fi
