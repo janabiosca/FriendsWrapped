@@ -284,7 +284,7 @@ before cloud plans and deployments can run; local source publication alone runs 
 
 - Deployed: Academy ingestion, invitation-based Spotify connection, authenticated group dashboard and weekly PDF workflow. Three Spotify listeners and separate observer access.
 - Prepared only: own-account `prod` ingestion configuration, GitHub OIDC roles and automated cloud deployment. `prod` does not include dashboard, connection or Wrapped stacks.
-- Pending: monthly filter, concert discovery, Wrapped email delivery, API error/latency alarms and an explicit trace review.
+- Pending: monthly filter, concert discovery, Wrapped email delivery, an explicit trace review.
 - Not implemented: Glue/Athena analytics, curated Parquet data and Bedrock summaries. Raw S3 storage is a foundation, not a completed analytics pipeline.
 
 ## Parameters for Academy application stacks
@@ -292,7 +292,7 @@ before cloud plans and deployments can run; local source publication alone runs 
 Resource names retain their current defaults (`sfw-dev`, `LabRole`, `friends`) so
 parameterization alone does not rename existing resources. Each application stack
 accepts `aws_region`, `name_prefix`, `lab_role_name`, `table_name` and `group_id`.
-Dashboard and Wrapped require `raw_bucket_name`; Wrapped also requires
+Dashboard and Wrapped require `raw_bucket_name`; All three stacks require
 `alarm_topic_arn`. Supply real values locally or obtain them from ingestion outputs:
 
 ```bash
@@ -306,3 +306,24 @@ The new alarm output requires an ingestion apply/refresh-only apply reviewed aga
 its existing state before downstream automation reads it. Inspect every cloud plan;
 never accept resource replacement merely to adopt these parameters. These source
 changes have not been applied to the live Academy deployment.
+
+## API observability
+
+The connection and dashboard stacks define HTTP API `5xx` alarms and p95 latency
+alarms (3 seconds in two of three five-minute windows). Missing data is not a failure;
+latency alarms ignore low-sample percentile windows, appropriate for this small group.
+All application functions have error alarms routed to the existing SNS topic. The
+`sfw-dev-operations` CloudWatch dashboard shows web request counts, errors and latency,
+and errors/throttles for all six functions. These use standard API metrics rather
+than additional per-route metrics.
+
+Active X-Ray tracing is configured for all application Lambdas and the weekly state
+machine. This provides service-level segments; it does not automatically instrument
+Python SDK or Spotify HTTP calls. HTTP APIs do not provide the REST API X-Ray stage
+setting. Inspect actual trace segments before claiming complete end-to-end coverage.
+Tracing requires the existing LabRole to permit X-Ray writes. Alerts, metrics and
+trace storage may incur usage charges; availability still depends on Academy.
+
+The current Academy identity denies `xray:GetTraceSummaries`; a full review of trace
+segments remains pending access. Configuration and Lambda log reports can be checked
+separately and must not be presented as proof of full trace ingestion.

@@ -14,3 +14,4 @@ supersedes the old one.
 | [005](005-academy-sandbox-vs-own-account.md) | AWS Academy for dev, own account for prod |
 | [006](006-encryption-and-accepted-findings.md) | Encryption choices and accepted security findings |
 | [007](007-history-pagination.md) | History pagination, checkpoint safety and recovery limits |
+| [008](008-api-observability.md) | API errors, latency, function alarms and service tracing |

@@ -66,8 +66,11 @@ data "archive_file" "connect" {
 }
 
 resource "aws_lambda_function" "connect" {
-  function_name    = "${var.name_prefix}-connect"
-  role             = data.aws_iam_role.lab.arn
+  function_name = "${var.name_prefix}-connect"
+  role          = data.aws_iam_role.lab.arn
+  tracing_config {
+    mode = "Active"
+  }
   runtime          = "python3.13"
   handler          = "spotify_connect.handler"
   filename         = data.archive_file.connect.output_path
