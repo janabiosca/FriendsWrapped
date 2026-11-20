@@ -1,5 +1,5 @@
-# AWS Academy sandbox: for experimenting. Roles cannot be created, credentials expire with the
-# lab session and the sandbox is not guaranteed to stay up, so the real history lives in prod.
+# AWS Academy hosts the current real history. Credentials expire with the lab session;
+# continued operation is not guaranteed. The optional prod configuration is not deployed.
 module "ingestion" {
   source = "../../modules/ingestion"
 
@@ -9,7 +9,7 @@ module "ingestion" {
   alarm_email          = var.alarm_email
   collect_schedule     = var.collect_schedule
   lab_role_name        = "LabRole"
-  protect_data         = false # throwaway: terraform destroy must be able to delete everything
+  protect_data         = false # no deletion protection: inspect destruction plans carefully; this is real history
   customer_managed_key = false # AWS managed encryption: LabRole may not be allowed to use our own keys
   log_retention_days   = 7
 

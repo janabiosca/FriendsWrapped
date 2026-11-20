@@ -72,7 +72,7 @@ jobs:
           export TF_VAR_table_name="$(terraform -chdir=infra/envs/$TF_ENV output -raw table_name)"
           export TF_VAR_group_id="$(terraform -chdir=infra/envs/$TF_ENV output -raw group_id)"
           export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/$TF_ENV output -raw alarm_topic_arn)"
-          for stack in connect dashboard wrapped; do
+          for stack in connect dashboard wrapped analytics; do
             state_name="$stack"
             if [ "$stack" = "connect" ]; then state_name="spotify-connect"; fi
             terraform -chdir=infra/$stack init -input=false \
