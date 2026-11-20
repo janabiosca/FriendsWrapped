@@ -47,6 +47,7 @@ infra/
   connect/                remote Spotify authorization by invitation
   dashboard/              Cognito sign-in and private group statistics
   wrapped/                weekly Step Functions workflow and PDF generation
+  analytics/              Glue catalog and bounded Athena SQL analysis
   bootstrap/github-oidc/  one-off: lets GitHub Actions log in to AWS without stored keys
 src/                      Lambda code; the PDF renderer also uses ReportLab
 tests/                    pytest + moto (in-memory AWS), Spotify faked
@@ -285,7 +286,8 @@ before cloud plans and deployments can run; local source publication alone runs 
 - Deployed: Academy ingestion, invitation-based Spotify connection, authenticated group dashboard and weekly PDF workflow. Three Spotify listeners and separate observer access.
 - Prepared only: own-account `prod` ingestion configuration, GitHub OIDC roles and automated cloud deployment. `prod` does not include dashboard, connection or Wrapped stacks.
 - Pending: monthly filter, concert discovery, Wrapped email delivery, an explicit trace review.
-- Not implemented: Glue/Athena analytics, curated Parquet data and Bedrock summaries. Raw S3 storage is a foundation, not a completed analytics pipeline.
+- Deployed analytics layer: Glue catalog and Athena SQL over the private raw archive.
+- Not implemented: curated Parquet transformation, a Glue ETL job and Bedrock summaries.
 
 ## Parameters for Academy application stacks
 
@@ -327,3 +329,39 @@ trace storage may incur usage charges; availability still depends on Academy.
 The current Academy identity denies `xray:GetTraceSummaries`; a full review of trace
 segments remains pending access. Configuration and Lambda log reports can be checked
 separately and must not be presented as proof of full trace ingestion.
+
+## Raw archive analytics (Glue and Athena)
+
+`infra/analytics` manages an independent catalog/query layer, with state key
+`dev/analytics.tfstate`. The data flow is S3 raw JSON -> Glue Data Catalog -> Athena SQL.
+It does not modify ingestion, DynamoDB or the hosted application. All results remain
+private under `analytics-results/` in the existing bucket and are encrypted with SSE-S3.
+The enforced workgroup cutoff is 100 MiB scanned per query, not a total spending cap.
+
+```bash
+terraform -chdir=infra/analytics init -backend-config=../envs/dev/backend.conf -backend-config="key=dev/analytics.tfstate"
+# Set TF_VAR_raw_bucket_name from the existing ingestion raw_bucket output.
+terraform -chdir=infra/analytics plan
+terraform -chdir=infra/analytics apply
+.venv/bin/python scripts/query_analytics.py --query counts --start-date 2026-11-01 --end-date 2026-11-20
+.venv/bin/python scripts/query_analytics.py --query top_artists --start-date 2026-11-01 --end-date 2026-11-20
+.venv/bin/python scripts/query_analytics.py --query monthly --start-date 2026-11-01 --end-date 2026-11-20
+```
+
+Use the dates covering the archived collections you want to inspect. The dates are
+inclusive and filter UTC collection partitions; they are not filters on playback time.
+Monthly results group actual playback timestamps in Europe/Madrid. Minutes are full
+track-duration estimates. The monthly query does not yet add a monthly web filter.
+
+In the AWS Athena console select workgroup `sfw-dev-analytics`, database
+`sfw_dev_analytics` and a saved query. Queries deduplicate overlapping pages while
+preserving repeat plays at different times. A collaboration counts for each distinct
+credited artist; credited artist totals can therefore exceed the number of plays.
+Raw-derived totals may differ from operational DynamoDB counts because archived pages
+can include playback context outside a collection checkpoint. Compare like-for-like
+sources before interpreting differences as missing data.
+
+Listener partitions are configured through `listener_ids`; update that list when a new
+Spotify listener joins. Observers need no partition. The current schema covers raw
+Spotify responses, not imported export files. There is no crawler, Glue ETL job or
+curated Parquet layer in this implementation. See decision [009](docs/decisions/009-raw-analytics-catalog.md).
