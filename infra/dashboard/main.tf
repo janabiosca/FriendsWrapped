@@ -50,8 +50,11 @@ resource "aws_cloudwatch_log_group" "dashboard" {
 }
 
 resource "aws_lambda_function" "signup" {
-  function_name    = "${var.name_prefix}-signup"
-  role             = data.aws_iam_role.lab.arn
+  function_name = "${var.name_prefix}-signup"
+  role          = data.aws_iam_role.lab.arn
+  tracing_config {
+    mode = "Active"
+  }
   runtime          = "python3.13"
   handler          = "dashboard.signup"
   filename         = data.archive_file.dashboard.output_path
@@ -147,8 +150,11 @@ resource "aws_cognito_user_pool_domain" "web" {
 }
 
 resource "aws_lambda_function" "dashboard" {
-  function_name    = "${var.name_prefix}-dashboard"
-  role             = data.aws_iam_role.lab.arn
+  function_name = "${var.name_prefix}-dashboard"
+  role          = data.aws_iam_role.lab.arn
+  tracing_config {
+    mode = "Active"
+  }
   runtime          = "python3.13"
   handler          = "dashboard.handler"
   filename         = data.archive_file.dashboard.output_path

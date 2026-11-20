@@ -40,8 +40,11 @@ resource "aws_cloudwatch_log_group" "wrapped" {
 }
 
 resource "aws_lambda_function" "wrapped" {
-  function_name    = "${var.name_prefix}-wrapped"
-  role             = data.aws_iam_role.lab.arn
+  function_name = "${var.name_prefix}-wrapped"
+  role          = data.aws_iam_role.lab.arn
+  tracing_config {
+    mode = "Active"
+  }
   runtime          = "python3.13"
   handler          = "wrapped.handler"
   filename         = data.archive_file.wrapped.output_path
@@ -62,6 +65,9 @@ resource "aws_sfn_state_machine" "wrapped" {
   name     = "${var.name_prefix}-weekly-wrapped"
   role_arn = data.aws_iam_role.lab.arn
   type     = "STANDARD"
+  tracing_configuration {
+    enabled = true
+  }
   definition = jsonencode({
     StartAt        = "PrepareWeeklySnapshot"
     TimeoutSeconds = 600

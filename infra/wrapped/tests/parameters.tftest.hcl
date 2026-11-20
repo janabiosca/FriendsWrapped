@@ -28,6 +28,16 @@ run "custom_environment" {
     alarm_topic_arn = "arn:aws:sns:eu-west-1:123456789012:test-alarms"
   }
   assert {
+    condition     = aws_lambda_function.wrapped.tracing_config[0].mode == "Active"
+    error_message = "Application functions must enable tracing."
+  }
+
+  assert {
+    condition     = aws_sfn_state_machine.wrapped.tracing_configuration[0].enabled
+    error_message = "Weekly orchestration must enable tracing."
+  }
+
+  assert {
     condition     = aws_lambda_function.wrapped.environment[0].variables.TABLE_NAME == "test-listening"
     error_message = "The function must use the configured table rather than the Academy table."
   }

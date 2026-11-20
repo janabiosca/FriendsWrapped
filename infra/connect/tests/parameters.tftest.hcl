@@ -20,12 +20,27 @@ mock_provider "archive" {}
 run "custom_environment" {
   command = plan
   variables {
+    alarm_topic_arn   = "arn:aws:sns:eu-west-1:123456789012:test-alarms"
     aws_region        = "eu-west-1"
     name_prefix       = "sfw-test"
     table_name        = "test-listening"
     group_id          = "test-group"
     spotify_client_id = "test-client"
   }
+  assert {
+    condition     = aws_lambda_function.connect.tracing_config[0].mode == "Active"
+    error_message = "Application functions must enable tracing."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.api_errors.metric_name == "5xx" && aws_cloudwatch_metric_alarm.api_errors.dimensions.Stage == "$default"
+    error_message = "HTTP API alarms must monitor HTTP API 5xx metrics for the deployed stage."
+  }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.api_latency.datapoints_to_alarm == 2 && aws_cloudwatch_metric_alarm.api_latency.evaluate_low_sample_count_percentiles == "ignore"
+    error_message = "Latency alarms must tolerate a single slow window and sparse traffic."
+  }
+
   assert {
     condition     = aws_lambda_function.connect.environment[0].variables.TABLE_NAME == "test-listening"
     error_message = "The function must use the configured table rather than the Academy table."

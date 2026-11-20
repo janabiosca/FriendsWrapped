@@ -18,3 +18,8 @@ variable "group_id" {
   type    = string
   default = "friends"
 }
+
+variable "alarm_topic_arn" {
+  description = "Existing ingestion SNS topic for operational alarms."
+  type        = string
+}
