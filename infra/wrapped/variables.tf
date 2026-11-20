@@ -26,3 +26,12 @@ variable "alarm_topic_arn" {
   description = "Existing ingestion SNS alarm topic ARN."
   type        = string
 }
+
+variable "dashboard_url" {
+  description = "Existing authenticated dashboard home URL, used in availability notices."
+  type        = string
+  validation {
+    condition     = can(regex("^https://[A-Za-z0-9.-]+/?$", var.dashboard_url))
+    error_message = "Supply the HTTPS dashboard home URL without query parameters."
+  }
+}

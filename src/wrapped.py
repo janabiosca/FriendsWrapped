@@ -122,6 +122,9 @@ def handler(event, context):
         result = prepare(event.get('request') or {}, reference)
     elif event.get('action') == 'archive':
         result = archive(event['snapshot'])
+    elif event.get('action') == 'notify':
+        from wrapped_notifications import notify
+        result = notify(event['snapshot'], getattr(context, 'aws_request_id', None))
     else:
         raise ValueError('Unknown Wrapped action')
     print(json.dumps({'event': 'wrapped_' + event['action'], 'week_start': result['week_start']}))

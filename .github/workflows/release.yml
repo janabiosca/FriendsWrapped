@@ -81,5 +81,8 @@ jobs:
               -backend-config="region=$AWS_REGION" \
               -backend-config="use_lockfile=true" -backend-config="encrypt=true"
             terraform -chdir=infra/$stack validate
+            if [ "$stack" = "wrapped" ]; then
+              export TF_VAR_dashboard_url="$(terraform -chdir=infra/dashboard output -raw dashboard_url)"
+            fi
             terraform -chdir=infra/$stack apply -auto-approve -input=false -lock-timeout=60s
           done

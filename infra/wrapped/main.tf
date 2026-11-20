@@ -53,9 +53,11 @@ resource "aws_lambda_function" "wrapped" {
   memory_size      = 256
   environment {
     variables = {
-      TABLE_NAME = var.table_name
-      RAW_BUCKET = var.raw_bucket_name
-      GROUP_ID   = var.group_id
+      TABLE_NAME       = var.table_name
+      RAW_BUCKET       = var.raw_bucket_name
+      GROUP_ID         = var.group_id
+      NOTICE_TOPIC_ARN = var.alarm_topic_arn
+      DASHBOARD_URL    = var.dashboard_url
     }
   }
   depends_on = [aws_cloudwatch_log_group.wrapped]
@@ -106,6 +108,25 @@ resource "aws_sfn_state_machine" "wrapped" {
         Retry = [{
           ErrorEquals     = ["States.TaskFailed"]
           IntervalSeconds = 2
+          MaxAttempts     = 3
+          BackoffRate     = 2
+        }]
+        Next = "NotifyWeeklyWrapped"
+      }
+      NotifyWeeklyWrapped = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::lambda:invoke"
+        Parameters = {
+          FunctionName = aws_lambda_function.wrapped.arn
+          Payload = {
+            action       = "notify"
+            "snapshot.$" = "$"
+          }
+        }
+        OutputPath = "$.Payload"
+        Retry = [{
+          ErrorEquals     = ["States.TaskFailed"]
+          IntervalSeconds = 30
           MaxAttempts     = 3
           BackoffRate     = 2
         }]

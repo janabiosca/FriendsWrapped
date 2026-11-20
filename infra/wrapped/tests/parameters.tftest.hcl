@@ -18,14 +18,23 @@ mock_provider "aws" {
 
 mock_provider "archive" {}
 run "custom_environment" {
-  command = plan
+  command = apply
   variables {
+    dashboard_url   = "https://dashboard.example.com/"
     aws_region      = "eu-west-1"
     name_prefix     = "sfw-test"
     table_name      = "test-listening"
     group_id        = "test-group"
     raw_bucket_name = "test-analytics-raw"
     alarm_topic_arn = "arn:aws:sns:eu-west-1:123456789012:test-alarms"
+  }
+  assert {
+    condition     = jsondecode(aws_sfn_state_machine.wrapped.definition).States.ArchiveWeeklyWrapped.Next == "NotifyWeeklyWrapped"
+    error_message = "Notifications must run after archival, not before the PDF exists."
+  }
+  assert {
+    condition     = aws_lambda_function.wrapped.environment[0].variables.DASHBOARD_URL == "https://dashboard.example.com/"
+    error_message = "The notice must link to the configured authenticated dashboard."
   }
   assert {
     condition     = aws_lambda_function.wrapped.tracing_config[0].mode == "Active"

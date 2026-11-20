@@ -9,8 +9,8 @@ is built on top of this history.
 
 The current AWS Academy deployment collects three Spotify accounts every five minutes.
 The hosted dashboard supports separate user accounts, shared group profiles, observer
-access and weekly PDF downloads. Concert discovery and Wrapped email delivery remain
-pending. The `prod` environment is prepared configuration for an optional own account.
+access and weekly PDF downloads. Concert discovery and personalized Wrapped email delivery through SES remain
+pending. Availability notices use the existing confirmed SNS subscription. The `prod` environment is prepared configuration for an optional own account.
 
 ## Architecture (v0.2)
 
@@ -263,9 +263,10 @@ terraform -chdir=infra/wrapped apply
 ```
 
 An authenticated group member or observer can download the last complete week's
-PDF report from the dashboard. Generation and download do not send email. SES account
+PDF report from the dashboard. After successful archival, a third workflow step publishes an availability notice through
+the existing confirmed SNS topic. Downloading the PDF does not send a notice. SES account
 and identity configuration queries were denied in the current Academy session;
-email delivery remains pending. The schedule depends on Academy availability.
+personalized email delivery remains pending. The schedule depends on Academy availability.
 
 
 The account label always identifies the signed-in member. Selecting a friend's profile
@@ -285,7 +286,7 @@ before cloud plans and deployments can run; local source publication alone runs 
 
 - Deployed: Academy ingestion, invitation-based Spotify connection, authenticated group dashboard and weekly PDF workflow. Three Spotify listeners and separate observer access.
 - Prepared only: own-account `prod` ingestion configuration, GitHub OIDC roles and automated cloud deployment. `prod` does not include dashboard, connection or Wrapped stacks.
-- Pending: concert discovery, Wrapped email delivery and a complete trace review.
+- Pending: concert discovery, personalized SES email delivery and a complete trace review.
 - Deployed analytics layer: Glue catalog and Athena SQL over the private raw archive.
 - Not implemented: curated Parquet transformation, a Glue ETL job and Bedrock summaries.
 
@@ -302,6 +303,7 @@ export TF_VAR_raw_bucket_name="$(terraform -chdir=infra/envs/dev output -raw raw
 export TF_VAR_table_name="$(terraform -chdir=infra/envs/dev output -raw table_name)"
 export TF_VAR_group_id="$(terraform -chdir=infra/envs/dev output -raw group_id)"
 export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/dev output -raw alarm_topic_arn)"
+export TF_VAR_dashboard_url="$(terraform -chdir=infra/dashboard output -raw dashboard_url)"
 ```
 
 The new alarm output requires an ingestion apply/refresh-only apply reviewed against
@@ -379,3 +381,24 @@ This web filter queries DynamoDB, rather than starting paid Athena queries for e
 page refresh. Athena remains a separate analytical view of archived response pages.
 The local preview shares the same calendar-range helper. `PREVIEW_PORT` optionally
 selects a different loopback port for independent preview sessions.
+
+## Wrapped availability notices
+
+The weekly workflow now prepares, archives and then notifies. `infra/wrapped` requires
+`dashboard_url`, obtained from the existing dashboard output. A notice links to the
+web home page; users sign in before downloading the private PDF. It contains the week
+and link, without an attachment or listening details. The current SNS topic has only
+the owner's confirmed email subscription. Friends and teachers are not subscribed by
+being registered in the application.
+
+A per-group/week DynamoDB receipt suppresses repeated completed publishes. Conditional
+leases prevent simultaneous sends and permit recovery after a crash. This reduces
+application duplicates, but standard SNS and a failure between publishing and saving
+the receipt can still produce duplicate emails. `published` records SNS acceptance,
+not proof of inbox delivery. Historical backfills skip the notice because the current
+download route serves the latest complete week. SNS failures leave the archived PDF
+intact and are reported through the existing workflow failure alarm.
+
+The Academy fallback shares the confirmed operations topic. A separate notification
+topic and personalized SES emails remain future work. See decision
+[010](docs/decisions/010-wrapped-availability-notice.md).
