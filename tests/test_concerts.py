@@ -57,10 +57,17 @@ def test_failure_while_writing_does_not_hide_previous_snapshot(discovery, monkey
     concerts.collect('friends', NOW)
     real_resource = concerts.boto3.resource
     original = real_resource('dynamodb').Table('sfw-test')
+    monkeypatch.setattr(concerts.ticketmaster, 'artist_events', lambda *args: [event(), event('event-2')])
     class BrokenTable:
-        def update_item(self, **kwargs): raise RuntimeError('Storage unavailable')
+        calls = 0
+        def update_item(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return original.update_item(**kwargs)
+            raise RuntimeError('Storage unavailable')
+    partial = BrokenTable()
     class Resource:
-        def Table(self, name): return BrokenTable()
+        def Table(self, name): return partial
     monkeypatch.setattr(concerts.boto3, 'resource', lambda name: Resource())
     with pytest.raises(RuntimeError):
         concerts.collect('friends', NOW + timedelta(hours=1))
