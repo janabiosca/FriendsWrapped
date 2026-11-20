@@ -22,3 +22,7 @@ output "dispatcher_function" {
 output "collect_dlq_url" {
   value = module.ingestion.collect_dlq_url
 }
+
+output "alarm_topic_arn" {
+  value = module.ingestion.alarm_topic_arn
+}

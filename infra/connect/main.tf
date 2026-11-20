@@ -14,7 +14,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
   default_tags {
     tags = {
       Project   = "spotify-friends-wrapped"
@@ -28,11 +28,11 @@ variable "spotify_client_id" {
 }
 
 data "aws_iam_role" "lab" {
-  name = "LabRole"
+  name = var.lab_role_name
 }
 
 resource "aws_dynamodb_table" "oauth" {
-  name         = "sfw-dev-connect"
+  name         = "${var.name_prefix}-connect"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
   attribute {
@@ -49,12 +49,12 @@ resource "aws_dynamodb_table" "oauth" {
 }
 
 resource "aws_apigatewayv2_api" "connect" {
-  name          = "sfw-dev-connect"
+  name          = "${var.name_prefix}-connect"
   protocol_type = "HTTP"
 }
 
 resource "aws_cloudwatch_log_group" "connect" {
-  name              = "/aws/lambda/sfw-dev-connect"
+  name              = "/aws/lambda/${var.name_prefix}-connect"
   retention_in_days = 7
 }
 
@@ -66,7 +66,7 @@ data "archive_file" "connect" {
 }
 
 resource "aws_lambda_function" "connect" {
-  function_name    = "sfw-dev-connect"
+  function_name    = "${var.name_prefix}-connect"
   role             = data.aws_iam_role.lab.arn
   runtime          = "python3.13"
   handler          = "spotify_connect.handler"
@@ -76,10 +76,10 @@ resource "aws_lambda_function" "connect" {
   memory_size      = 256
   environment {
     variables = {
-      TABLE_NAME        = "sfw-dev"
+      TABLE_NAME        = var.table_name
       OAUTH_TABLE_NAME  = aws_dynamodb_table.oauth.name
-      SECRET_PREFIX     = "sfw-dev/spotify/"
-      GROUP_ID          = "friends"
+      SECRET_PREFIX     = "${var.name_prefix}/spotify/"
+      GROUP_ID          = var.group_id
       SPOTIFY_CLIENT_ID = var.spotify_client_id
       CONNECT_BASE_URL  = aws_apigatewayv2_api.connect.api_endpoint
     }

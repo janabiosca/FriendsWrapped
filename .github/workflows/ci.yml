@@ -50,6 +50,7 @@ jobs:
           for stack in connect dashboard wrapped; do
             terraform -chdir=infra/$stack init -backend=false -input=false
             terraform -chdir=infra/$stack validate
+            terraform -chdir=infra/$stack test
           done
 
   security-scan:
@@ -120,6 +121,10 @@ jobs:
           set -o pipefail
           terraform -chdir=infra/envs/$TF_ENV plan -no-color -input=false -lock-timeout=60s | tee plan.txt
           if [ "$TF_ENV" = "dev" ]; then
+            export TF_VAR_raw_bucket_name="$(terraform -chdir=infra/envs/$TF_ENV output -raw raw_bucket)"
+            export TF_VAR_table_name="$(terraform -chdir=infra/envs/$TF_ENV output -raw table_name)"
+            export TF_VAR_group_id="$(terraform -chdir=infra/envs/$TF_ENV output -raw group_id)"
+            export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/$TF_ENV output -raw alarm_topic_arn)"
             for stack in connect dashboard wrapped; do
               state_name="$stack"
               if [ "$stack" = "connect" ]; then state_name="spotify-connect"; fi

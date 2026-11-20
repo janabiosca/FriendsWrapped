@@ -14,7 +14,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
   default_tags {
     tags = {
       Project   = "spotify-friends-wrapped"
@@ -24,7 +24,7 @@ provider "aws" {
 }
 
 data "aws_iam_role" "lab" {
-  name = "LabRole"
+  name = var.lab_role_name
 }
 
 data "archive_file" "dashboard" {
@@ -45,12 +45,12 @@ data "archive_file" "dashboard" {
 
 resource "aws_cloudwatch_log_group" "dashboard" {
   for_each          = toset(["dashboard", "signup"])
-  name              = "/aws/lambda/sfw-dev-${each.key}"
+  name              = "/aws/lambda/${var.name_prefix}-${each.key}"
   retention_in_days = 7
 }
 
 resource "aws_lambda_function" "signup" {
-  function_name    = "sfw-dev-signup"
+  function_name    = "${var.name_prefix}-signup"
   role             = data.aws_iam_role.lab.arn
   runtime          = "python3.13"
   handler          = "dashboard.signup"
@@ -60,14 +60,14 @@ resource "aws_lambda_function" "signup" {
   memory_size      = 256
   environment {
     variables = {
-      OAUTH_TABLE_NAME = "sfw-dev-connect"
+      OAUTH_TABLE_NAME = "${var.name_prefix}-connect"
     }
   }
   depends_on = [aws_cloudwatch_log_group.dashboard]
 }
 
 resource "aws_cognito_user_pool" "group" {
-  name                     = "sfw-dev-friends"
+  name                     = "${var.name_prefix}-${var.group_id}"
   user_pool_tier           = "LITE"
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
@@ -112,7 +112,7 @@ resource "aws_lambda_permission" "signup" {
 }
 
 resource "aws_apigatewayv2_api" "dashboard" {
-  name          = "sfw-dev-dashboard"
+  name          = "${var.name_prefix}-dashboard"
   protocol_type = "HTTP"
 }
 
@@ -147,7 +147,7 @@ resource "aws_cognito_user_pool_domain" "web" {
 }
 
 resource "aws_lambda_function" "dashboard" {
-  function_name    = "sfw-dev-dashboard"
+  function_name    = "${var.name_prefix}-dashboard"
   role             = data.aws_iam_role.lab.arn
   runtime          = "python3.13"
   handler          = "dashboard.handler"
@@ -157,11 +157,11 @@ resource "aws_lambda_function" "dashboard" {
   memory_size      = 256
   environment {
     variables = {
-      RAW_BUCKET        = "sfw-dev-raw-6e5880d28f5d8e514bf6ee4650"
-      TABLE_NAME        = "sfw-dev"
-      OAUTH_TABLE_NAME  = "sfw-dev-connect"
-      GROUP_ID          = "friends"
-      COGNITO_DOMAIN    = "https://${aws_cognito_user_pool_domain.web.domain}.auth.us-east-1.amazoncognito.com"
+      RAW_BUCKET        = var.raw_bucket_name
+      TABLE_NAME        = var.table_name
+      OAUTH_TABLE_NAME  = "${var.name_prefix}-connect"
+      GROUP_ID          = var.group_id
+      COGNITO_DOMAIN    = "https://${aws_cognito_user_pool_domain.web.domain}.auth.${var.aws_region}.amazoncognito.com"
       COGNITO_CLIENT_ID = aws_cognito_user_pool_client.web.id
       DASHBOARD_URL     = "${aws_apigatewayv2_api.dashboard.api_endpoint}/"
     }
@@ -183,7 +183,7 @@ resource "aws_apigatewayv2_authorizer" "members" {
   name             = "group-members"
   jwt_configuration {
     audience = [aws_cognito_user_pool_client.web.id]
-    issuer   = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.group.id}"
+    issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.group.id}"
   }
 }
 
