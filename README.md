@@ -9,8 +9,8 @@ is built on top of this history.
 
 The current AWS Academy deployment collects three Spotify accounts every five minutes.
 The hosted dashboard supports separate user accounts, shared group profiles, observer
-access and weekly PDF downloads. Concert discovery and personalized Wrapped email delivery through SES remain
-pending. Availability notices use the existing confirmed SNS subscription. The `prod` environment is prepared configuration for an optional own account.
+access and weekly PDF downloads. Live concert discovery remains pending provider approval. Personalized SES delivery is
+excluded from this delivery. Availability notices use the existing confirmed SNS subscription. The `prod` environment is prepared configuration for an optional own account.
 
 ## Architecture (v0.2)
 
@@ -277,19 +277,29 @@ are generated with ReportLab in a Lambda package built for Python 3.13 on Linux 
 run the package build before planning changes to the Wrapped deployment.
 
 
-GitHub Actions validates the ingestion module and the connection, dashboard and
-Wrapped stacks. Academy PR plans and release deployments use separate state keys
+GitHub Actions validates ingestion, connection, dashboard, Wrapped, analytics and
+concerts stacks. Academy PR plans and release deployments use separate state keys
 for each stack. PDF dependencies are built before planning or deploying the Wrapped
 function. AWS repository variables and expiring Academy credentials must be configured
 before cloud plans and deployments can run; local source publication alone runs CI.
 
-## Implementation status
+## Delivery status — 20 November 2026
 
-- Deployed: Academy ingestion, invitation-based Spotify connection, authenticated group dashboard and weekly PDF workflow. Three Spotify listeners and separate observer access.
-- Prepared only: own-account `prod` ingestion configuration, GitHub OIDC roles and automated cloud deployment. `prod` does not include dashboard, connection or Wrapped stacks.
-- Pending: concert discovery, personalized SES email delivery and a complete trace review.
-- Deployed analytics layer: Glue catalog and Athena SQL over the private raw archive.
-- Not implemented: curated Parquet transformation, a Glue ETL job and Bedrock summaries.
+- Working MVP in Academy: three Spotify listeners, invitation-based onboarding, Cognito sign-in, group and observer access, profile/month filters, weekly group rankings and private PDF downloads.
+- Weekly workflow: prepare snapshot -> archive PDF -> SNS availability notice. A real notice was received by the owner; repeating the workflow reused the publication receipt without rewriting the PDF.
+- Analytics: private Glue catalog and three working Athena queries over raw S3 JSON, checked against an independent reconstruction and a duplicate-input test.
+- Monitoring: API errors/latency alarms, function error alarms, operations dashboard and service tracing configuration. The latest full application test suite has 106 passing tests; CI also validates Terraform and runs Trivy.
+- Concerts: search/cache infrastructure and web section prepared, schedule disabled. Ticketmaster Developer approval is still pending, so live results and concert alerts are not part of the verified MVP.
+
+### Accepted limitations and excluded extensions
+
+- Collection depends on Academy availability; Spotify does not guarantee recovering all history after an interruption. Existing collection behavior is retained for this delivery.
+- SNS is the chosen email solution: a link requiring sign-in, without a PDF attachment or personalized SES email. SES configuration was denied by the lab and is not pursued for this delivery.
+- Active X-Ray configuration and trace IDs were checked, but `xray:GetTraceSummaries` is denied; detailed trace segments remain unreviewed.
+- `bedrock:ListFoundationModels` was denied. Bedrock summaries were not implemented; model invocation permissions were not separately established.
+- Creating the GitHub OIDC provider (`iam:CreateOpenIDConnectProvider`) was denied. OIDC roles and optional own-account `prod` ingestion remain prepared configuration, not deployed resources. No separate production account was opened.
+- GitHub CI is working. Automatic AWS PR plans and cloud deployments remain unconfigured; saved local Terraform plans must not be described as automatic PR plans.
+- Parquet/Glue ETL is an optional future extension. The implemented catalog/query layer reads JSON directly; it is not a curated Parquet pipeline.
 
 ## Parameters for Academy application stacks
 
@@ -319,7 +329,7 @@ alarms (3 seconds in two of three five-minute windows). Missing data is not a fa
 latency alarms ignore low-sample percentile windows, appropriate for this small group.
 All application functions have error alarms routed to the existing SNS topic. The
 `sfw-dev-operations` CloudWatch dashboard shows web request counts, errors and latency,
-and errors/throttles for all six functions. These use standard API metrics rather
+and errors/throttles for the application functions. These use standard API metrics rather
 than additional per-route metrics.
 
 Active X-Ray tracing is configured for all application Lambdas and the weekly state
