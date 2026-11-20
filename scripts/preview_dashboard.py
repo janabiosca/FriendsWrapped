@@ -12,8 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("TABLE_NAME", "sfw-dev")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+PORT = int(os.environ.get("PREVIEW_PORT", "8765"))
 from demo_weekly_ranking import demo_weekly_ranking
 from show_group_stats import weekly_from_store
+import stat_periods
 import listening_stats
 import store
 
@@ -22,7 +24,7 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        if self.headers.get("Host") not in ("127.0.0.1:8765", "localhost:8765"):
+        if self.headers.get("Host") not in (f"127.0.0.1:{PORT}", f"localhost:{PORT}"):
             self.send_error(403)
             return
         route = urlparse(self.path)
@@ -44,24 +46,22 @@ class Handler(BaseHTTPRequestHandler):
                 return
         elif route.path == "/api/stats":
             period = parse_qs(route.query).get("period", ["all"])[0]
-            if period not in ("all", "today", "7d"):
-                self.send_error(400)
-                return
             try:
                 now = dt.datetime.now(ZoneInfo("Europe/Madrid"))
-                start = "0000"
-                if period != "all":
-                    beginning = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                    if period == "7d":
-                        beginning -= dt.timedelta(days=6)
-                    start = beginning.astimezone(dt.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-                end = now.astimezone(dt.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+                month = parse_qs(route.query).get("month", [None])[0]
+                try:
+                    start, end = stat_periods.bounds(period, now, month)
+                except ValueError:
+                    self.send_error(400, "Invalid period or month")
+                    return
                 profile = store.get_profile("jana") or {}
                 result = listening_stats.summarize(store.plays_between("jana", start, end))
                 result.update(display_name=profile.get("display_name", "Jana"),
                     last_sync_at=profile.get("last_sync_at"),
                     last_sync_status=profile.get("last_sync_status"),
-                    possible_gaps=int(profile.get("possible_gaps", 0)), period=period)
+                    possible_gaps=int(profile.get("possible_gaps", 0)), period=period,
+                    month=month if period == "month" else None, current_month=now.strftime("%Y-%m"),
+                    period_start=start, period_end=end)
                 body = json.dumps(result, ensure_ascii=False).encode()
                 content_type = "application/json; charset=utf-8"
             except Exception:
@@ -83,5 +83,5 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 if __name__ == "__main__":
-    print("Vista privada: http://127.0.0.1:8765", flush=True)
-    ThreadingHTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
+    print(f"Vista privada: http://127.0.0.1:{PORT}", flush=True)
+    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

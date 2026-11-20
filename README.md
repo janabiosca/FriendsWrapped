@@ -179,7 +179,7 @@ monthly estimate as a measured project cost.
 Run `.venv/bin/python scripts/preview_dashboard.py`, then open http://127.0.0.1:8765.
 The preview is read-only, bound to loopback on this Mac, and uses the current local
 AWS credentials to query Jana's recorded plays. It never reads Spotify tokens.
-Filters: all recorded history, the last seven calendar days, or today (Europe/Madrid).
+Filters: all recorded history, the last seven calendar days, today, or a selected calendar month (Europe/Madrid).
 Refresh reloads stored statistics; collection is independently scheduled in AWS.
 The hosted group application is deployed separately through `infra/dashboard`, with
 Cognito authentication and group authorization.
@@ -285,7 +285,7 @@ before cloud plans and deployments can run; local source publication alone runs 
 
 - Deployed: Academy ingestion, invitation-based Spotify connection, authenticated group dashboard and weekly PDF workflow. Three Spotify listeners and separate observer access.
 - Prepared only: own-account `prod` ingestion configuration, GitHub OIDC roles and automated cloud deployment. `prod` does not include dashboard, connection or Wrapped stacks.
-- Pending: monthly filter, concert discovery, Wrapped email delivery, an explicit trace review.
+- Pending: concert discovery, Wrapped email delivery and a complete trace review.
 - Deployed analytics layer: Glue catalog and Athena SQL over the private raw archive.
 - Not implemented: curated Parquet transformation, a Glue ETL job and Bedrock summaries.
 
@@ -351,7 +351,7 @@ terraform -chdir=infra/analytics apply
 Use the dates covering the archived collections you want to inspect. The dates are
 inclusive and filter UTC collection partitions; they are not filters on playback time.
 Monthly results group actual playback timestamps in Europe/Madrid. Minutes are full
-track-duration estimates. The monthly query does not yet add a monthly web filter.
+track-duration estimates. The hosted dashboard also offers its own monthly filter over operational DynamoDB records.
 
 In the AWS Athena console select workgroup `sfw-dev-analytics`, database
 `sfw_dev_analytics` and a saved query. Queries deduplicate overlapping pages while
@@ -365,3 +365,17 @@ Listener partitions are configured through `listener_ids`; update that list when
 Spotify listener joins. Observers need no partition. The current schema covers raw
 Spotify responses, not imported export files. There is no crawler, Glue ETL job or
 curated Parquet layer in this implementation. See decision [009](docs/decisions/009-raw-analytics-catalog.md).
+
+## Monthly profile filter
+
+Choose **Por mes**, then select a month. Counts, estimated minutes, songs and artists
+use that calendar month in Europe/Madrid; month start is inclusive and next-month
+start exclusive. The current month ends at the request time. Future and malformed
+months return HTTP 400. The selected profile still must belong to the signed-in
+user's group; observers retain their existing access. The weekly group ranking
+continues to describe the current week independently of the profile filter.
+
+This web filter queries DynamoDB, rather than starting paid Athena queries for each
+page refresh. Athena remains a separate analytical view of archived response pages.
+The local preview shares the same calendar-range helper. `PREVIEW_PORT` optionally
+selects a different loopback port for independent preview sessions.

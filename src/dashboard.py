@@ -1,5 +1,5 @@
 """Private statistics behind API Gateway JWT authorization and group membership checks."""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import hashlib
 import base64
 import json
@@ -13,6 +13,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 from group_stats import weekly_from_store
+import stat_periods
 import listening_stats
 import store
 import wrapped
@@ -108,27 +109,26 @@ def handler(event, context):
             monday = now.date() - timedelta(days=now.weekday())
             return response(weekly_from_store(member['group_id'], monday, now))
         if path == '/api/stats':
-            period = (event.get('queryStringParameters') or {}).get('period', 'all')
-            if period not in ('all', 'today', '7d'):
-                return response({'error': 'Periodo inválido.'}, 400)
+            params = event.get('queryStringParameters') or {}
+            period = params.get('period', 'all')
+            month = params.get('month')
+            try:
+                start, end = stat_periods.bounds(period, now, month)
+            except ValueError as error:
+                return response({'error': str(error)}, 400)
             member_ids = store.group_members(member['group_id'])
             default_user = member['user_id'] if member['user_id'] in member_ids else next(iter(member_ids), None)
             selected_user = (event.get('queryStringParameters') or {}).get('user_id', default_user)
             if selected_user not in member_ids:
                 return response({'error': 'Este perfil no pertenece a tu grupo.'}, 403)
             profiles = {user_id: store.get_profile(user_id) or {} for user_id in member_ids}
-            start = '0000'
-            if period != 'all':
-                beginning = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                if period == '7d':
-                    beginning -= timedelta(days=6)
-                start = beginning.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-            end = now.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
             profile = profiles[selected_user]
             result = listening_stats.summarize(store.plays_between(selected_user, start, end))
             result.update(display_name=profile.get('display_name', selected_user),
                           last_sync_at=profile.get('last_sync_at'), last_sync_status=profile.get('last_sync_status'),
                           possible_gaps=int(profile.get('possible_gaps', 0)), period=period,
+                          month=month if period == 'month' else None,
+                          current_month=now.strftime('%Y-%m'), period_start=start, period_end=end,
                           selected_user_id=selected_user, account_user_id=member['user_id'],
                           account_name=profiles.get(member['user_id'], {}).get('display_name',
                               member.get('display_name', member['user_id'])),

@@ -118,3 +118,41 @@ def test_removed_viewer_cannot_read_group(setup, monkeypatch):
     userinfo(monkeypatch)
     dashboard.store.add_member('friends', 'anna', 'Anna')
     assert dashboard.handler(request('/api/group-weekly'), None)['statusCode'] == 403
+
+
+def test_month_filter_includes_first_local_instant_but_excludes_next_month(setup, monkeypatch):
+    allow()
+    userinfo(monkeypatch)
+    dashboard.store.add_member('friends', 'anna', 'Anna')
+    for at in ['2026-09-30T21:59:59.999Z', '2026-09-30T22:00:00.000Z',
+               '2026-10-31T22:59:59.999Z', '2026-10-31T23:00:00.000Z']:
+        dashboard.store.put_play('anna', {'played_at': at, 'track': {
+            'id': 'track-1', 'name': 'Song', 'duration_ms': 60000, 'artists': []}})
+    event = request()
+    event['queryStringParameters'] = {'period': 'month', 'month': '2026-10'}
+    result = dashboard.handler(event, None)
+    assert result['statusCode'] == 200
+    data = json.loads(result['body'])
+    assert data['total_plays'] == 2
+    assert data['estimated_minutes'] == 2
+    assert data['month'] == '2026-10'
+    assert data['period_start'] == '2026-09-30T22:00:00.000Z'
+    assert data['period_end'] == '2026-10-31T23:00:00.000Z'
+
+
+def test_invalid_month_is_a_client_error_not_a_server_error(setup, monkeypatch):
+    allow()
+    userinfo(monkeypatch)
+    dashboard.store.add_member('friends', 'anna', 'Anna')
+    event = request()
+    event['queryStringParameters'] = {'period': 'month', 'month': '2026-13'}
+    assert dashboard.handler(event, None)['statusCode'] == 400
+
+
+def test_month_filter_cannot_read_a_profile_outside_the_group(setup, monkeypatch):
+    allow()
+    userinfo(monkeypatch)
+    dashboard.store.add_member('friends', 'anna', 'Anna')
+    event = request()
+    event['queryStringParameters'] = {'period': 'month', 'month': '2026-10', 'user_id': 'outsider'}
+    assert dashboard.handler(event, None)['statusCode'] == 403
