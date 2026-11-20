@@ -27,3 +27,9 @@ variable "alarm_topic_arn" {
   description = "Existing ingestion SNS topic for operational alarms."
   type        = string
 }
+
+variable "concerts_enabled" {
+  description = "Expose cached concert results after Ticketmaster activation."
+  type        = bool
+  default     = false
+}

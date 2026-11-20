@@ -48,6 +48,7 @@ infra/
   dashboard/              Cognito sign-in and private group statistics
   wrapped/                weekly Step Functions workflow and PDF generation
   analytics/              Glue catalog and bounded Athena SQL analysis
+  concerts/               daily concert discovery (disabled pending provider approval)
   bootstrap/github-oidc/  one-off: lets GitHub Actions log in to AWS without stored keys
 src/                      Lambda code; the PDF renderer also uses ReportLab
 tests/                    pytest + moto (in-memory AWS), Spotify faked
@@ -402,3 +403,33 @@ intact and are reported through the existing workflow failure alarm.
 The Academy fallback shares the confirmed operations topic. A separate notification
 topic and personalized SES emails remain future work. See decision
 [010](docs/decisions/010-wrapped-availability-notice.md).
+
+## Concert discovery preparation
+
+Ticketmaster approval remains pending. `infra/concerts` prepares the Lambda, logs,
+error alarm and a daily 09:15 Europe/Madrid schedule, **disabled by default**. The
+protected `/api/concerts` route displays a clear not-activated state. There are no
+fabricated concerts and no live Discovery validation yet.
+
+The scanner considers the top five artists per listener over 30 days, searches future
+music events across Spain, matches attraction names and publishes a complete cache
+generation only after all queries and writes succeed. A failed scan preserves the
+previous result. A successful empty scan correctly hides old matches. The UI shows
+last-scan age; events and availability must be checked at the provider. Access uses
+the signed-in group, never a group ID supplied in the URL.
+
+After Ticketmaster approval:
+
+1. Run `.venv/bin/python scripts/configure_ticketmaster.py` locally and enter the key
+   at the hidden prompt. Do not place it in GitHub, Terraform state or chat.
+2. Deploy/review the concerts stack with existing table, group and alarm parameters,
+   using independent state key `dev/concerts.tfstate`.
+3. Run one real Lambda scan and review coverage, errors and cached results.
+4. Set `concerts_enabled=true` for both the concerts and dashboard stacks. If cloud
+   workflows are configured, also persist repository variable `CONCERTS_ENABLED=true`.
+
+The default secret identifier is `<name_prefix>/ticketmaster`. No key is created by
+Terraform. The existing key-configuration script targets `sfw-dev/ticketmaster`.
+This layer does not send new-concert email alerts yet; those remain a follow-up after
+live provider validation. Old scan generations currently remain in DynamoDB. See
+[decision 011](docs/decisions/011-concert-discovery.md).

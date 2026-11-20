@@ -164,6 +164,7 @@ resource "aws_lambda_function" "dashboard" {
   environment {
     variables = {
       RAW_BUCKET        = var.raw_bucket_name
+      CONCERTS_ENABLED  = tostring(var.concerts_enabled)
       TABLE_NAME        = var.table_name
       OAUTH_TABLE_NAME  = "${var.name_prefix}-connect"
       GROUP_ID          = var.group_id
@@ -200,7 +201,7 @@ resource "aws_apigatewayv2_route" "page" {
 }
 
 resource "aws_apigatewayv2_route" "statistics" {
-  for_each             = toset(["/api/stats", "/api/group-weekly", "/api/wrapped"])
+  for_each             = toset(["/api/stats", "/api/group-weekly", "/api/wrapped", "/api/concerts"])
   api_id               = aws_apigatewayv2_api.dashboard.id
   route_key            = "GET ${each.value}"
   target               = "integrations/${aws_apigatewayv2_integration.dashboard.id}"

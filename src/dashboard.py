@@ -14,6 +14,7 @@ from botocore.exceptions import ClientError
 
 from group_stats import weekly_from_store
 import stat_periods
+import concerts
 import listening_stats
 import store
 import wrapped
@@ -105,6 +106,11 @@ def handler(event, context):
                 'content-disposition': 'attachment; filename="friends-wrapped-' + monday.isoformat() + '.pdf"',
                 'x-content-type-options': 'nosniff',
             }, 'body': base64.b64encode(report).decode('ascii')}
+        if path == '/api/concerts':
+            enabled = os.environ.get('CONCERTS_ENABLED', 'false').lower() == 'true'
+            if not enabled:
+                return response({'enabled': False, 'events': [], 'country': 'ES', 'last_scan_at': None})
+            return response({'enabled': True, **concerts.list_concerts(member['group_id'], now)})
         if path == '/api/group-weekly':
             monday = now.date() - timedelta(days=now.weekday())
             return response(weekly_from_store(member['group_id'], monday, now))

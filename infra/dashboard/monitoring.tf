@@ -69,7 +69,7 @@ resource "aws_cloudwatch_dashboard" "operations" {
           metrics = [["AWS/ApiGateway", "Latency", "ApiId", aws_apigatewayv2_api.dashboard.id]]
         }
       }
-      ], [for i, name in ["dispatcher", "collector", "connect", "signup", "dashboard", "wrapped"] : {
+      ], [for i, name in ["dispatcher", "collector", "connect", "signup", "dashboard", "wrapped", "concerts"] : {
         type = "metric", x = (i % 2) * 12, y = 6 + floor(i / 2) * 6, width = 12, height = 6
         properties = {
           title = "${name}: errors and throttles", region = var.aws_region, period = 300, stat = "Sum"

@@ -34,6 +34,7 @@
   </div>
 </section>
 <section class="panel weekly" id="wrapped-panel" hidden><h2>El Wrapped de la semana pasada</h2><p class="sub">Resumen del grupo de la última semana completa, de lunes a domingo.</p><button class="refresh" id="download-wrapped">Descargar Wrapped en PDF</button><p class="status" id="wrapped-status" role="status"></p></section>
+<section class="panel weekly" id="concerts-panel" aria-labelledby="concerts-heading"><h2 id="concerts-heading">Vuestra música, en directo</h2><p class="sub">Próximos conciertos en España de los artistas más escuchados en los últimos 30 días.</p><p id="concerts-status" role="status">Consultando conciertos…</p><div id="concerts-results"></div><p class="notice" id="concerts-note" hidden>Resultados de Ticketmaster. No incluye todos los conciertos; comprueba la fecha y disponibilidad en la página del evento.</p></section>
 <footer><span>Friends Wrapped · Proyecto Cloud Solutions</span><span>Solo música. Sin podcasts.</span></footer></main>
 <script>
 const $=id=>document.getElementById(id);let period='all';let busy=false;let selectedUser=null;
@@ -54,8 +55,31 @@ $('status').textContent=(d.last_sync_status==='ok'?'● Sincronización correcta
 if(d.first_play_at)$('status').textContent+=' · Reproducciones: '+date(d.first_play_at)+' — '+date(d.last_play_at);
 if(d.possible_gaps)$('status').textContent+=' · Hay posibles huecos en el historial.';
 }
-async function load(){if(busy)return;busy=true;$('refresh').disabled=true;$('profile-select').disabled=true;$('month-select').disabled=true;document.querySelectorAll('[data-period]').forEach(b=>b.disabled=true);$('content').setAttribute('aria-busy','true');$('error').hidden=true;try{const r=await apiFetch('/api/stats?'+new URLSearchParams({period,...(period==='month'?{month:$('month-select').value}:{}),...(selectedUser?{user_id:selectedUser}:{})}));const d=await r.json();if(!r.ok)throw Error(d.error||'No se han podido cargar los datos.');render(d);await loadWeeklyRanking()}catch(e){$('error').textContent=e.message+' Puedes volver a intentarlo con Actualizar datos. Si ya había datos visibles, pertenecen a la última consulta correcta.';$('error').hidden=false}finally{busy=false;$('refresh').disabled=false;$('profile-select').disabled=false;$('month-select').disabled=false;document.querySelectorAll('[data-period]').forEach(b=>b.disabled=false);$('content').setAttribute('aria-busy','false')}}
+async function load(){if(busy)return;busy=true;$('refresh').disabled=true;$('profile-select').disabled=true;$('month-select').disabled=true;document.querySelectorAll('[data-period]').forEach(b=>b.disabled=true);$('content').setAttribute('aria-busy','true');$('error').hidden=true;try{const r=await apiFetch('/api/stats?'+new URLSearchParams({period,...(period==='month'?{month:$('month-select').value}:{}),...(selectedUser?{user_id:selectedUser}:{})}));const d=await r.json();if(!r.ok)throw Error(d.error||'No se han podido cargar los datos.');render(d);await Promise.all([loadWeeklyRanking(),loadConcerts()])}catch(e){$('error').textContent=e.message+' Puedes volver a intentarlo con Actualizar datos. Si ya había datos visibles, pertenecen a la última consulta correcta.';$('error').hidden=false}finally{busy=false;$('refresh').disabled=false;$('profile-select').disabled=false;$('month-select').disabled=false;document.querySelectorAll('[data-period]').forEach(b=>b.disabled=false);$('content').setAttribute('aria-busy','false')}}
 document.querySelectorAll('[data-period]').forEach(b=>b.onclick=()=>{period=b.dataset.period;$('month-control').hidden=period!=='month';document.querySelectorAll('[data-period]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));load()});$('month-select').onchange=()=>{if($('month-select').value)load()};$('refresh').onclick=load;$('profile-select').onchange=()=>{selectedUser=$('profile-select').value;load()};
+
+
+async function loadConcerts(){
+  if(!hostedConfig){$('concerts-panel').hidden=true;return}
+  try{
+    const response=await apiFetch('/api/concerts');
+    if(!response.ok)throw Error('No se han podido consultar los conciertos.');
+    const data=await response.json();$('concerts-results').replaceChildren();$('concerts-note').hidden=!data.enabled;
+    if(!data.enabled){$('concerts-status').textContent='La búsqueda de conciertos todavía no está activada.';return}
+    if(!data.last_scan_at){$('concerts-status').textContent='La primera búsqueda todavía no ha terminado.';return}
+    const updated=new Date(data.last_scan_at).toLocaleString('es-ES',{timeZone:'Europe/Madrid',dateStyle:'short',timeStyle:'short'});
+    $('concerts-status').textContent=(data.events.length?'Última búsqueda: '+updated:'No hemos encontrado próximos conciertos para los artistas consultados. Última búsqueda: '+updated)+(data.stale?' · Estos resultados llevan más de 48 horas sin actualizarse.':'');
+    for(const event of data.events){
+      const row=el('article','row'),text=el('div','artistline');
+      text.append(el('h3','name',event.name));
+      const when=event.date_time?new Date(event.date_time).toLocaleString('es-ES',{timeZone:event.timezone,dateStyle:'medium',timeStyle:'short'}):event.local_date+' · Hora pendiente';
+      text.append(el('div','artist',when+' · '+event.venue+' · '+event.city),el('div','artist',event.artists.join(', ')));
+      row.append(text);
+      if(event.url&&event.url.startsWith('https://')){const link=el('a','count','Ver evento');link.href=event.url;link.target='_blank';link.rel='noopener noreferrer';row.append(link)}
+      $('concerts-results').append(row);
+    }
+  }catch(error){$('concerts-results').replaceChildren();$('concerts-status').textContent='No se han podido consultar los conciertos. Puedes volver a intentarlo con Actualizar datos.'}
+}
 
 async function loadWeeklyRanking() {
   $('weekly-status').hidden = false;
