@@ -96,16 +96,20 @@ Use `dev` the same way in the AWS Academy sandbox (`scripts/bootstrap_state.sh d
 
 ## CI/CD (GitOps)
 
-GitHub Actions provides CI. AWS deployments have been performed manually; automated
-PR plans and release deployment are prepared but require AWS configuration. OIDC roles
-have not been deployed. CI success alone does not demonstrate automated deployment.
+GitHub Actions provides CI on every push and pull request. AWS deployments have been
+performed from a workstation with reviewed, saved plans (see the deployment record below).
+Automated PR plans and release deployments are written but need the repository variables
+and secrets listed below before they can reach AWS. OIDC roles are prepared but not deployed,
+because the Academy account cannot create an OIDC provider.
 
 - **ci.yml**, on every push and pull request: Python tests, `terraform fmt -check`,
   `terraform test` (module tests with mocked AWS), `terraform validate` of each environment,
   Trivy (blocks on HIGH/CRITICAL misconfigurations and on committed secrets) and, on pull
   requests, a `terraform plan` posted as a PR comment.
-- **release.yml**, when a GitHub release is published (`v0.2.0`, `v0.3.0`…): tests, then `terraform apply`.
-  Give the GitHub environment `prod` required reviewers so production deploys need an approval.
+- **release.yml**, when a GitHub release is published (`v0.2.0`, `v0.3.0`…): tests, then `terraform apply`
+  of the ingestion stack and the application stacks. The concerts stack is skipped unless
+  `CONCERTS_ENABLED` is `true`. The apply runs without an interactive confirmation, so give the
+  GitHub environment (`dev` or `prod`) required reviewers and check the PR plan first.
 
 Repository configuration (Settings → Secrets and variables → Actions):
 
@@ -291,13 +295,29 @@ for each stack. PDF dependencies are built before planning or deploying the Wrap
 function. AWS repository variables and expiring Academy credentials must be configured
 before cloud plans and deployments can run; local source publication alone runs CI.
 
-## Delivery status — 20 November 2026
+## Delivery status — 22 November 2026
 
 - Working MVP in Academy: three Spotify listeners, invitation-based onboarding, Cognito sign-in, group and observer access, profile/month filters, weekly group rankings and private PDF downloads.
-- Weekly workflow: prepare snapshot -> archive PDF -> SNS availability notice. A real notice was received by the owner; repeating the workflow reused the publication receipt without rewriting the PDF.
+- Weekly workflow: prepare snapshot -> archive PDF -> SNS availability notice. Notices use a dedicated Wrapped topic with every group member subscribed (each recipient confirms the subscription). A manual run on 22 November delivered the notice to the confirmed members; the publication receipt still prevents a second notice for the same week.
 - Analytics: private Glue catalog and three working Athena queries over raw S3 JSON, checked against an independent reconstruction and a duplicate-input test.
-- Monitoring: API errors/latency alarms, function error alarms, operations dashboard and service tracing configuration. The latest full application test suite has 106 passing tests; CI also validates Terraform and runs Trivy.
+- Monitoring: API errors/latency alarms, function error alarms, operations dashboard and service tracing configuration. The full application test suite passes in CI, together with Terraform format/validate/tests and the Trivy scan.
+- Reproducibility: account-specific values (raw bucket, listener IDs, administrator name, collection schedule, notice recipients) are Terraform variables, so the same code deploys to another account by changing configuration only (ADR 012).
 - Concerts: search/cache infrastructure and web section prepared, schedule disabled. Ticketmaster Developer approval is still pending, so live results and concert alerts are not part of the verified MVP.
+
+### Deployment record — 22 November 2026
+
+The current source was deployed to the Academy account from a second team member's
+workstation, using only the variables above:
+
+1. Backup first: raw bucket objects, both DynamoDB tables and the previous Lambda packages.
+2. A plan per stack, saved with `-out` and reviewed before applying it.
+3. Applied stack by stack (connect, dashboard, ingestion, Wrapped) with 0 resources destroyed.
+   Analytics had no changes; concerts was left untouched.
+4. Verified after each step: dashboard sign-in and statistics, connect health page, collector
+   logs with no errors and empty queues, and a Wrapped notice delivered by SNS.
+
+Collection had been paused (SQS trigger disabled); the ingestion apply re-enabled it and the
+queued collections recovered the plays still available from Spotify.
 
 ### Accepted limitations and excluded extensions
 
@@ -306,7 +326,7 @@ before cloud plans and deployments can run; local source publication alone runs 
 - Active X-Ray configuration and trace IDs were checked, but `xray:GetTraceSummaries` is denied; detailed trace segments remain unreviewed.
 - `bedrock:ListFoundationModels` was denied. Bedrock summaries were not implemented; model invocation permissions were not separately established.
 - Creating the GitHub OIDC provider (`iam:CreateOpenIDConnectProvider`) was denied. OIDC roles and optional own-account `prod` ingestion remain prepared configuration, not deployed resources. No separate production account was opened.
-- GitHub CI is working. Automatic AWS PR plans and cloud deployments remain unconfigured; saved local Terraform plans must not be described as automatic PR plans.
+- GitHub CI is working. Automatic AWS PR plans and release deployments need repository variables and Academy credentials, which expire with each lab session; deployments so far used reviewed local plans.
 - Parquet/Glue ETL is an optional future extension. The implemented catalog/query layer reads JSON directly; it is not a curated Parquet pipeline.
 
 ## Parameters for Academy application stacks
@@ -325,10 +345,9 @@ export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/dev output -raw ala
 export TF_VAR_dashboard_url="$(terraform -chdir=infra/dashboard output -raw dashboard_url)"
 ```
 
-The new alarm output requires an ingestion apply/refresh-only apply reviewed against
-its existing state before downstream automation reads it. Inspect every cloud plan;
-never accept resource replacement merely to adopt these parameters. These source
-changes have not been applied to the live Academy deployment.
+The `alarm_topic_arn` output is available in the ingestion state since the 22 November
+apply. Inspect every cloud plan and never accept resource replacement merely to adopt
+these parameters. These changes are applied to the live Academy deployment.
 
 ## API observability
 
@@ -348,8 +367,8 @@ Tracing requires the existing LabRole to permit X-Ray writes. Alerts, metrics an
 trace storage may incur usage charges; availability still depends on Academy.
 
 The current Academy identity denies `xray:GetTraceSummaries`; a full review of trace
-segments remains pending access. Configuration and Lambda log reports can be checked
-separately and must not be presented as proof of full trace ingestion.
+segments remains pending access. Configuration and Lambda log reports were checked,
+but they do not prove that complete traces are ingested.
 
 ## Raw archive analytics (Glue and Athena)
 
@@ -443,7 +462,7 @@ the signed-in group, never a group ID supplied in the URL.
 After Ticketmaster approval:
 
 1. Run `.venv/bin/python scripts/configure_ticketmaster.py` locally and enter the key
-   at the hidden prompt. Do not place it in GitHub, Terraform state or chat.
+   at the hidden prompt. The key is kept out of GitHub, Terraform state and shared messages.
 2. Deploy/review the concerts stack with existing table, group and alarm parameters,
    using independent state key `dev/concerts.tfstate`.
 3. Run one real Lambda scan and review coverage, errors and cached results.

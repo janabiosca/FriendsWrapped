@@ -18,3 +18,4 @@ supersedes the old one.
 | [009](009-raw-analytics-catalog.md) | Glue catalog, partition projection and deduplicated Athena analysis |
 | [010](010-wrapped-availability-notice.md) | SNS availability notices, durable receipts and delivery limits |
 | [011](011-concert-discovery.md) | Disabled concert discovery, exact-name matching and complete cache generations |
+| [012](012-configuration-outside-code.md) | Account-specific configuration outside the code |

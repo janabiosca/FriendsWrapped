@@ -1,6 +1,6 @@
 # 002 · SQS FIFO queue with one message group per user
 
-**Context.** Every hour all friends must be collected. Spotify may return a new refresh token
+**Context.** All friends are collected on a schedule (every five minutes in the Academy deployment). Spotify may return a new refresh token
 on each refresh, and the old one stops working. If two runs refreshed the same user's token
 at once, one of them would save a token that is already dead.
 
