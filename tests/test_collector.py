@@ -89,7 +89,7 @@ def test_collecting_twice_does_not_duplicate(aws, fake):
     assert collector.collect("jana")["new_plays"] == 3
     assert collector.collect("jana")["new_plays"] == 0
     assert len(stored("jana")) == 3
-    assert store.get_profile("jana")["total_plays"] == 3
+    assert "total_plays" not in store.get_profile("jana")
 
 
 def test_only_new_plays_are_fetched_after_the_cursor(aws, fake):
@@ -110,6 +110,11 @@ def test_same_song_played_twice_counts_twice(aws, fake):
 def test_retry_after_lost_cursor_update_is_idempotent(aws, fake, monkeypatch):
     """Plays were stored but the function died before moving the cursor: the retry must not double count."""
     fake.plays = [play(1), play(5, "t2")]
+    store._table().update_item(
+        Key={"PK": "USER#jana", "SK": "PROFILE"},
+        UpdateExpression="SET total_plays = :old",
+        ExpressionAttributeValues={":old": 99},
+    )
     real_record_sync = store.record_sync
     monkeypatch.setattr(store, "record_sync", lambda *a: (_ for _ in ()).throw(RuntimeError("crash")))
     with pytest.raises(RuntimeError):
@@ -118,7 +123,9 @@ def test_retry_after_lost_cursor_update_is_idempotent(aws, fake, monkeypatch):
     monkeypatch.setattr(store, "record_sync", real_record_sync)
     assert collector.collect("jana")["new_plays"] == 0
     assert len(stored("jana")) == 2
-    assert store.get_profile("jana")["cursor_ms"] > 0
+    profile = store.get_profile("jana")
+    assert profile["cursor_ms"] == collector.played_at_ms(fake.plays[-1]["played_at"])
+    assert "total_plays" not in profile
 
 
 def test_one_user_failing_does_not_affect_the_others(aws, fake):

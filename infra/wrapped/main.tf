@@ -56,7 +56,7 @@ resource "aws_lambda_function" "wrapped" {
       TABLE_NAME       = var.table_name
       RAW_BUCKET       = var.raw_bucket_name
       GROUP_ID         = var.group_id
-      NOTICE_TOPIC_ARN = var.alarm_topic_arn
+      NOTICE_TOPIC_ARN = aws_sns_topic.wrapped_notices.arn
       DASHBOARD_URL    = var.dashboard_url
     }
   }
@@ -136,6 +136,28 @@ resource "aws_sfn_state_machine" "wrapped" {
   })
 }
 
+resource "aws_sns_topic" "wrapped_notices" {
+  name = "${var.name_prefix}-wrapped-notices"
+  # Accepted finding (ADR 006): AWS managed key; Academy cannot rely on customer managed keys
+  # and the notice only carries the week dates and the dashboard URL.
+  #trivy:ignore:AWS-0136
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_sns_topic_subscription" "wrapped_email" {
+  for_each  = var.wrapped_notice_emails
+  topic_arn = aws_sns_topic.wrapped_notices.arn
+  protocol  = "email"
+  endpoint  = each.value
+}
+
+resource "aws_sqs_queue" "scheduler_dlq" {
+  count                     = var.scheduler_dlq_enabled ? 1 : 0
+  name                      = "${var.name_prefix}-wrapped-scheduler-dlq"
+  message_retention_seconds = 1209600
+  sqs_managed_sse_enabled   = true
+}
+
 resource "aws_scheduler_schedule" "wrapped" {
   name                         = "${var.name_prefix}-weekly-wrapped"
   schedule_expression          = "cron(0 9 ? * MON *)"
@@ -147,6 +169,12 @@ resource "aws_scheduler_schedule" "wrapped" {
     arn      = aws_sfn_state_machine.wrapped.arn
     role_arn = data.aws_iam_role.lab.arn
     input    = "{}"
+    dynamic "dead_letter_config" {
+      for_each = aws_sqs_queue.scheduler_dlq
+      content {
+        arn = dead_letter_config.value.arn
+      }
+    }
     retry_policy {
       maximum_event_age_in_seconds = 3600
       maximum_retry_attempts       = 3

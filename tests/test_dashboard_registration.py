@@ -23,10 +23,24 @@ def test_teacher_is_registered_only_as_an_observer(monkeypatch):
 
 
 def test_new_user_requires_observer_flag(monkeypatch):
+    import store
+    monkeypatch.setattr(store, 'group_members', lambda group: ['anna'])
     monkeypatch.setattr(sys, 'argv', ['register', '--user-id', 'prof-test', '--email', 'teacher@example.com'])
     with pytest.raises(SystemExit) as error:
         allow_dashboard_member.main()
     assert error.value.code == 2
+
+
+def test_connected_listener_needs_no_observer_flag(monkeypatch):
+    import store
+    oauth = Mock()
+    monkeypatch.setattr(store, 'group_members', lambda group: ['anna'])
+    monkeypatch.setattr(allow_dashboard_member.boto3, 'resource', lambda *a, **k: Mock(Table=lambda name: oauth))
+    monkeypatch.setattr(sys, 'argv', ['register', '--user-id', 'anna', '--email', 'anna@example.com',
+                                    '--group', 'friends'])
+    allow_dashboard_member.main()
+    assert oauth.put_item.call_args.kwargs['Item'] == {
+        'id': oauth.put_item.call_args.kwargs['Item']['id'], 'user_id': 'anna', 'group_id': 'friends'}
 
 
 def test_existing_observer_keeps_default_name(monkeypatch):

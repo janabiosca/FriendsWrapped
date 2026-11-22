@@ -4,7 +4,7 @@ variable "region" {
 }
 
 variable "github_repository" {
-  description = "owner/name of the GitHub repository allowed to deploy, e.g. jana-biosca/spotify-friends-wrapped"
+  description = "owner/name of the GitHub repository allowed to deploy, e.g. <owner>/<repo>"
   type        = string
 }
 

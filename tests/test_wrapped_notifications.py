@@ -51,6 +51,9 @@ def test_retry_does_not_publish_again_and_notice_has_no_listening_details(ready_
     assert 'https://dashboard.example.com/' in message['Message']
     assert 'Inicia sesión' in message['Message']
     assert 'Artist' not in message['Message']
+    assert message['Subject'] == 'Vuestro Friends Wrapped ya esta listo (9-15 nov)'
+    assert message['Subject'].isascii() and len(message['Subject']) < 100
+    assert 'Semana del lunes 9 al domingo 15 de noviembre' in message['Message']
     assert wrapped.read_object(ready_notice['pdf_key']) == original
     receipt = table().get_item(Key=key())['Item']
     assert receipt['notice_status'] == 'sent'
@@ -135,3 +138,8 @@ def test_handler_routes_notice_action(ready_notice, monkeypatch):
     result = wrapped.handler({'action': 'notify', 'snapshot': ready_notice}, None)
     assert result['notification_status'] == 'published'
     assert len(sns.calls) == 1
+
+
+def test_notice_wording_across_months():
+    assert notices.week_label(date(2026, 10, 26), date(2026, 11, 1)) == 'lunes 26 de octubre al domingo 1 de noviembre'
+    assert notices.notice_subject(date(2026, 12, 28), date(2027, 1, 3)) == 'Vuestro Friends Wrapped ya esta listo (28 dic - 3 ene)'

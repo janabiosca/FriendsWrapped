@@ -81,7 +81,13 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       TF_VAR_spotify_client_id: ${{ vars.SPOTIFY_CLIENT_ID }}
       TF_VAR_concerts_enabled: ${{ vars.CONCERTS_ENABLED || 'false' }}
+      TF_VAR_wrapped_notice_emails: ${{ secrets.WRAPPED_NOTICE_EMAILS || '[]' }}
+      TF_VAR_scheduler_dlq_enabled: ${{ vars.SCHEDULER_DLQ_ENABLED || 'false' }}
       TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+      TF_VAR_existing_raw_bucket: ${{ vars.RAW_BUCKET_NAME }}
+      TF_VAR_listener_ids: ${{ vars.LISTENER_IDS }}
+      TF_VAR_admin_name: ${{ vars.ADMIN_NAME || 'la administradora del grupo' }}
+      TF_VAR_collect_schedule: ${{ vars.COLLECT_SCHEDULE || 'rate(1 hour)' }}
     concurrency: terraform-${{ vars.TF_ENV || 'dev' }}
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +143,13 @@ jobs:
               if [ "$stack" = "wrapped" ]; then
                 export TF_VAR_dashboard_url="$(terraform -chdir=infra/dashboard output -raw dashboard_url)"
               fi
-              terraform -chdir=infra/$stack plan -no-color -input=false -lock-timeout=60s | tee -a plan.txt
+              if [ "$stack" = "wrapped" ]; then
+                # Subscriber emails stay out of the PR comment; the summary still shows any destroy.
+                summary="$(terraform -chdir=infra/$stack plan -no-color -input=false -lock-timeout=60s | grep -E '^Plan:|^No changes')"
+                echo "Wrapped plan (subscriber details omitted): $summary" >> plan.txt
+              else
+                terraform -chdir=infra/$stack plan -no-color -input=false -lock-timeout=60s | tee -a plan.txt
+              fi
             done
           fi
       - name: Comment the plan on the pull request

@@ -1,4 +1,4 @@
-# 010 · Notify availability through the existing confirmed SNS subscription
+# 010 · Notify availability through a dedicated SNS topic
 
 **Context.** SES account and identity configuration is denied in the current Academy
 session. The owner already has one confirmed email subscription to the operations
@@ -6,10 +6,7 @@ SNS topic. Reports are private and downloaded after group authentication.
 
 **Decision.** Append `NotifyWeeklyWrapped` after successful report archival in the
 Standard Step Functions workflow. The same Wrapped Lambda publishes a plain text
-notice with the week and authenticated dashboard URL to the existing topic. It does
-not attach a PDF, include listening statistics or create additional subscriptions.
-This is an Academy fallback; a separate product-notification topic would separate
-preferences from technical alarms in a future deployment.
+notice with the week and authenticated dashboard URL to the dedicated Wrapped SNS topic. Operations alarms use a separate topic.
 
 Validate the ready manifest against the configured group and confirm the PDF exists.
 Skip notices for historical weeks because the dashboard downloads the last complete
@@ -29,10 +26,6 @@ can also redeliver. This implementation reduces duplicates but does not provide
 exactly-once email delivery. A failed notifier does not delete or rewrite the report;
 the workflow failure alarm signals the issue while the PDF remains downloadable.
 
-**Recipients.** The checked Academy topic currently has only the owner's confirmed
-email endpoint. Spotify membership or Cognito signup does not subscribe anyone to SNS.
-Adding friends or teachers as recipients is a separate explicit action and requires
-their confirmation. Sharing the alert topic also means its subscription preferences
-apply to both operational alarms and availability notices.
+**Recipients.** Configure opted-in addresses with `wrapped_notice_emails`. Each recipient confirms their subscription. Cognito registration does not subscribe users.
 
 References: [SNS delivery retries](https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html).

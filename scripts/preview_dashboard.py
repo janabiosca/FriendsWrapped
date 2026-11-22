@@ -13,11 +13,14 @@ sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("TABLE_NAME", "sfw-dev")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 PORT = int(os.environ.get("PREVIEW_PORT", "8765"))
+GROUP_ID = os.environ.get("GROUP_ID", "friends")
 from demo_weekly_ranking import demo_weekly_ranking
 from show_group_stats import weekly_from_store
 import stat_periods
 import listening_stats
 import store
+
+PREVIEW_USER_ID = os.environ.get("PREVIEW_USER_ID")
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -38,7 +41,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 today = dt.datetime.now(ZoneInfo("Europe/Madrid")).date()
                 monday = today - dt.timedelta(days=today.weekday())
-                result = weekly_from_store(os.environ.get("GROUP_ID", "friends"), monday)
+                result = weekly_from_store(GROUP_ID, monday)
                 body = json.dumps(result, ensure_ascii=False).encode()
                 content_type = "application/json; charset=utf-8"
             except Exception:
@@ -54,9 +57,12 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError:
                     self.send_error(400, "Invalid period or month")
                     return
-                profile = store.get_profile("jana") or {}
-                result = listening_stats.summarize(store.plays_between("jana", start, end))
-                result.update(display_name=profile.get("display_name", "Jana"),
+                user_id = PREVIEW_USER_ID or next(iter(store.group_members(GROUP_ID)), None)
+                if not user_id:
+                    raise LookupError("group has no members")
+                profile = store.get_profile(user_id) or {}
+                result = listening_stats.summarize(store.plays_between(user_id, start, end))
+                result.update(display_name=profile.get("display_name", user_id),
                     last_sync_at=profile.get("last_sync_at"),
                     last_sync_status=profile.get("last_sync_status"),
                     possible_gaps=int(profile.get("possible_gaps", 0)), period=period,
@@ -83,5 +89,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--user-id", default=os.environ.get("PREVIEW_USER_ID"),
+                        help="member to preview (default: first member of the group)")
+    PREVIEW_USER_ID = parser.parse_args().user_id
     print(f"Vista privada: http://127.0.0.1:{PORT}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

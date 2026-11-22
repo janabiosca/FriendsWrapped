@@ -17,7 +17,6 @@ variable "raw_bucket_name" {
 variable "listener_ids" {
   description = "Spotify listeners represented by S3 partitions; observers have no listening partitions."
   type        = set(string)
-  default     = ["jana", "anna", "helena"]
   validation {
     condition     = length(var.listener_ids) > 0 && alltrue([for id in var.listener_ids : can(regex("^[a-z0-9-]+$", id))])
     error_message = "Supply at least one listener ID consisting of lowercase letters, digits and hyphens."

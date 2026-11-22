@@ -17,5 +17,11 @@
 | AWS-0025 DynamoDB uses the AWS managed key | Encrypted at rest with KMS; a CMK adds cost and key-policy work for little gain with 4 users |
 | AWS-0089 S3 access logging disabled | Only our Lambdas write to the bucket, and CloudTrail records management events |
 
+**Accepted finding (HIGH), reviewed and suppressed inline:**
+
+| Trivy check | Why we accept it |
+|---|---|
+| AWS-0136 Wrapped notice topic uses the AWS managed SNS key | The notice contains only the week dates and the dashboard URL, no listening data; AWS Academy cannot rely on customer managed keys. A CMK would be used in an own account |
+
 **Consequences.** Review this note if the data changes (e.g. emails or locations stored in
 S3) or the group grows beyond friends.

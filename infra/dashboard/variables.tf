@@ -33,3 +33,9 @@ variable "concerts_enabled" {
   type        = bool
   default     = false
 }
+
+variable "admin_name" {
+  description = "Name shown to members when they must contact the group administrator"
+  type        = string
+  default     = "la administradora del grupo"
+}

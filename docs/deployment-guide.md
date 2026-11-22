@@ -12,7 +12,7 @@ is built on top of this history.
 The current AWS Academy deployment collects three Spotify accounts every five minutes.
 The hosted dashboard supports separate user accounts, shared group profiles, observer
 access and weekly PDF downloads. Live concert discovery remains pending provider approval. Personalized SES delivery is
-excluded from this delivery. Availability notices use the existing confirmed SNS subscription. The `prod` environment is prepared configuration for an optional own account.
+excluded from this delivery. Availability notices use a dedicated Wrapped SNS topic. The `prod` environment is prepared configuration for an optional own account.
 
 ## Architecture (v0.2)
 
@@ -88,7 +88,7 @@ Requirements: Terraform >= 1.10, AWS CLI, Python 3.12+, credentials of the targe
    Confirm the SNS subscription email AWS sends to `alarm_email`.
 5. **Connect each friend** (each one logs in with her own Spotify account):
    ```bash
-   python scripts/connect_spotify.py --env prod --client-id <id> --user-id jana --name Jana --email jana@example.com
+   python scripts/connect_spotify.py --env prod --client-id <id> --user-id alice --name Alice --email alice@example.com
    ```
 
 Use `dev` the same way in the AWS Academy sandbox (`scripts/bootstrap_state.sh dev`, `infra/envs/dev`).
@@ -116,6 +116,11 @@ Repository configuration (Settings → Secrets and variables → Actions):
 | `AWS_REGION` | variable | `us-east-1` |
 | `SPOTIFY_CLIENT_ID` | variable | Spotify app client ID |
 | `ALARM_EMAIL` | variable | team email |
+| `RAW_BUCKET_NAME` | variable | raw bucket created by hand for `dev` (`aws s3api create-bucket`, see ADR 005) |
+| `LISTENER_IDS` | variable | JSON list of Spotify listener IDs for Athena partitions, e.g. `["alice","bob"]` |
+| `ADMIN_NAME` | variable | name shown on error pages and the sign-in screen (optional) |
+| `COLLECT_SCHEDULE` | variable | collection schedule, e.g. `rate(5 minutes)` (default `rate(1 hour)`) |
+| `WRAPPED_NOTICE_EMAILS` | secret | JSON list of weekly notice recipients; must match the current subscribers or the release removes them |
 | `AWS_PLAN_ROLE_ARN`, `AWS_APPLY_ROLE_ARN` | variables | own account: outputs of `infra/bootstrap/github-oidc` (short-lived OIDC credentials) |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | secrets | AWS Academy only (used when the role variables are empty); they expire with the lab session |
 
@@ -181,7 +186,8 @@ monthly estimate as a measured project cost.
 
 Run `.venv/bin/python scripts/preview_dashboard.py`, then open http://127.0.0.1:8765.
 The preview is read-only, bound to loopback on this Mac, and uses the current local
-AWS credentials to query Jana's recorded plays. It never reads Spotify tokens.
+AWS credentials to query the recorded plays of one member (`--user-id`, by default the
+first member of the group). It never reads Spotify tokens.
 Filters: all recorded history, the last seven calendar days, today, or a selected calendar month (Europe/Madrid).
 Refresh reloads stored statistics; collection is independently scheduled in AWS.
 The hosted group application is deployed separately through `infra/dashboard`, with
@@ -267,7 +273,7 @@ terraform -chdir=infra/wrapped apply
 
 An authenticated group member or observer can download the last complete week's
 PDF report from the dashboard. After successful archival, a third workflow step publishes an availability notice through
-the existing confirmed SNS topic. Downloading the PDF does not send a notice. SES account
+the dedicated Wrapped SNS topic. Downloading the PDF does not send a notice. SES account
 and identity configuration queries were denied in the current Academy session;
 personalized email delivery remains pending. The schedule depends on Academy availability.
 
@@ -400,8 +406,7 @@ selects a different loopback port for independent preview sessions.
 The weekly workflow now prepares, archives and then notifies. `infra/wrapped` requires
 `dashboard_url`, obtained from the existing dashboard output. A notice links to the
 web home page; users sign in before downloading the private PDF. It contains the week
-and link, without an attachment or listening details. The current SNS topic has only
-the owner's confirmed email subscription. Friends and teachers are not subscribed by
+and link, without an attachment or listening details. Set `TF_VAR_wrapped_notice_emails` to a JSON array of opted-in email addresses in the deploying environment. Use the same list for future applies. Each recipient must confirm the SNS subscription. Friends and teachers are not subscribed by
 being registered in the application.
 
 A per-group/week DynamoDB receipt suppresses repeated completed publishes. Conditional
@@ -412,8 +417,13 @@ not proof of inbox delivery. Historical backfills skip the notice because the cu
 download route serves the latest complete week. SNS failures leave the archived PDF
 intact and are reported through the existing workflow failure alarm.
 
-The Academy fallback shares the confirmed operations topic. A separate notification
-topic and personalized SES emails remain future work. See decision
+For GitHub deployments set the WRAPPED_NOTICE_EMAILS secret to the same JSON array.
+The Wrapped Lambda role needs permission to publish to the dedicated encrypted topic,
+including access to the SNS KMS key. Confirm delivery before relying on weekly notices.
+To enable the optional scheduler DLQ, verify LabRole has sqs:SendMessage on
+<name_prefix>-wrapped-scheduler-dlq, then set TF_VAR_scheduler_dlq_enabled=true
+(or the SCHEDULER_DLQ_ENABLED repository variable). Its CloudWatch alarm uses
+the operations topic. This detects exhausted target delivery attempts. See decision
 [010](decisions/010-wrapped-availability-notice.md).
 
 ## Concert discovery preparation
