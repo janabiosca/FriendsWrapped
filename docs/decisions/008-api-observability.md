@@ -22,8 +22,8 @@ A synthetic monitor may be useful later but has not been implemented.
 react to actual traffic rather than continuously proving availability. Service-level
 tracing does not instrument Spotify HTTP requests or Python SDK calls automatically.
 The Academy session permits configuration changes but denies `xray:GetTraceSummaries`;
-reading actual trace segments cannot be verified with that identity. Do not describe
-configured tracing as a verified complete distributed trace.
+reading actual trace segments cannot be verified with that identity. Tracing is therefore
+configured, but a complete distributed trace has not been reviewed.
 
 References: [HTTP API metrics](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-metrics.html),
 [Step Functions tracing](https://docs.aws.amazon.com/step-functions/latest/dg/concepts-xray-tracing.html).
