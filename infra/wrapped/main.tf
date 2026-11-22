@@ -137,7 +137,10 @@ resource "aws_sfn_state_machine" "wrapped" {
 }
 
 resource "aws_sns_topic" "wrapped_notices" {
-  name              = "${var.name_prefix}-wrapped-notices"
+  name = "${var.name_prefix}-wrapped-notices"
+  # Accepted finding (ADR 006): AWS managed key; Academy cannot rely on customer managed keys
+  # and the notice only carries the week dates and the dashboard URL.
+  #trivy:ignore:AWS-0136
   kms_master_key_id = "alias/aws/sns"
 }
 
