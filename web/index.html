@@ -6,8 +6,8 @@
 .weekly{margin-top:28px}.weekly table{width:100%;border-collapse:collapse;text-align:left}.weekly th,.weekly td{padding:10px 12px;border-bottom:1px solid var(--line)}.weekly th{font-size:13px;color:var(--muted)}.weekly th:first-child,.weekly td:first-child{padding-left:0}.weekly .table-scroll{overflow:auto}.weekly h3{margin:0;font-size:16px}.weekly ul{padding-left:20px}.weekly progress{width:64px;vertical-align:middle;accent-color:var(--lime)}
 </style>
 <header><div class="brand">friends<span> wrapped</span><b> ✳</b></div><div><span class="pill" id="viewer">Cuenta</span> <button class="refresh" id="signout" hidden>Cerrar sesión</button></div></header>
-<section class="panel" id="auth-panel" style="max-width:600px;margin:60px auto" hidden><h1>Tu música,<br>en compañía.</h1><p id="auth-message">Entra con el correo que Jana ha añadido al grupo. La primera vez, crea tu cuenta y verifica el correo.</p><button class="refresh" id="signin">Iniciar sesión o crear cuenta</button></section>
-<main id="dashboard-main"><section class="intro"><div><div class="eyebrow">Tu música, en compañía</div><h1 id="profile-heading">Tu historia suena<br><em id="person-name">así, Jana.</em></h1><p>Las canciones que vuelven. Los artistas que se quedan.<br>Un pequeño retrato de lo que estás escuchando.</p></div><div class="record" aria-hidden="true"><span>fw</span></div></section>
+<section class="panel" id="auth-panel" style="max-width:600px;margin:60px auto" hidden><h1>Tu música,<br>en compañía.</h1><p id="auth-message">Entra con el correo que <span id="admin-name">la administradora del grupo</span> ha añadido. La primera vez, crea tu cuenta y verifica el correo.</p><button class="refresh" id="signin">Iniciar sesión o crear cuenta</button></section>
+<main id="dashboard-main"><section class="intro"><div><div class="eyebrow">Tu música, en compañía</div><h1 id="profile-heading">Tu historia suena<br><em id="person-name">Cargando…</em></h1><p>Las canciones que vuelven. Los artistas que se quedan.<br>Un pequeño retrato de lo que estás escuchando.</p></div><div class="record" aria-hidden="true"><span>fw</span></div></section>
 <div class="tools"><label id="profile-control" hidden>Perfil <select id="profile-select" aria-label="Perfil del grupo"></select></label><div class="tabs" aria-label="Periodo"><button data-period="all" aria-pressed="true">Todo lo guardado</button><button data-period="7d" aria-pressed="false">7 días</button><button data-period="today" aria-pressed="false">Hoy</button><button data-period="month" aria-pressed="false">Por mes</button></div><label id="month-control" hidden>Mes <input type="month" id="month-select" aria-label="Mes de las estadísticas"></label><button class="refresh" id="refresh">↻ Actualizar datos</button></div>
 <p class="sub" id="selected-period" role="status">Todo lo guardado · Horario de Madrid</p>
 <div class="error" id="error" role="alert" hidden></div>
@@ -39,6 +39,7 @@
 <script>
 const $=id=>document.getElementById(id);let period='all';let busy=false;let selectedUser=null;
 const hostedConfig = null;
+if (hostedConfig && hostedConfig.adminName) $('admin-name').textContent = hostedConfig.adminName;
 let accessToken = null;
 const fmt=n=>new Intl.NumberFormat('es-ES',{maximumFractionDigits:1}).format(n);
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}

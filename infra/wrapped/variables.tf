@@ -35,3 +35,15 @@ variable "dashboard_url" {
     error_message = "Supply the HTTPS dashboard home URL without query parameters."
   }
 }
+
+variable "wrapped_notice_emails" {
+  description = "Recipients of weekly availability notices. Each recipient confirms their SNS subscription."
+  type        = set(string)
+  default     = []
+}
+
+variable "scheduler_dlq_enabled" {
+  description = "Enable after confirming the schedule execution role can send messages to the scheduler DLQ."
+  type        = bool
+  default     = false
+}

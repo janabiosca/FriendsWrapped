@@ -4,7 +4,7 @@ Opens the Spotify login in the browser, then stores the refresh token in Secrets
 and registers the user in the group. Run it once per person (each one logs in with her
 own Spotify account; use a private window if several log in on the same laptop):
 
-    python scripts/connect_spotify.py --env prod --client-id <id> --user-id jana --name Jana --email jana@example.com
+    python scripts/connect_spotify.py --env prod --client-id <id> --user-id alice --name Alice --email alice@example.com
 
 Requires AWS credentials for the environment's account, `terraform apply` already run in
 infra/envs/<env>, and http://127.0.0.1:8888/callback as a redirect URI of the Spotify app.
@@ -98,7 +98,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--env", default="dev", choices=["dev", "prod"])
     parser.add_argument("--client-id", required=True)
-    parser.add_argument("--user-id", required=True, help="short id without spaces, e.g. jana")
+    parser.add_argument("--user-id", required=True, help="short id without spaces, e.g. alice")
     parser.add_argument("--name", required=True)
     parser.add_argument("--email", default="")
     parser.add_argument("--terraform", default="terraform", help="path to the terraform binary")

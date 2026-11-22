@@ -18,6 +18,37 @@ class NotificationBusy(RuntimeError):
     pass
 
 
+MONTHS = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+          'septiembre', 'octubre', 'noviembre', 'diciembre')
+SHORT_MONTHS = ('ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic')
+
+
+def week_label(monday, end):
+    """'lunes 9 al domingo 15 de noviembre' (the month is repeated only when it changes)."""
+    first = f'{monday.day}' if monday.month == end.month else f'{monday.day} de {MONTHS[monday.month - 1]}'
+    return f'lunes {first} al domingo {end.day} de {MONTHS[end.month - 1]}'
+
+
+def notice_subject(monday, end):
+    # SNS email subjects must be ASCII: no accents or emoji here.
+    span = (f'{monday.day}-{end.day} {SHORT_MONTHS[end.month - 1]}' if monday.month == end.month else
+            f'{monday.day} {SHORT_MONTHS[monday.month - 1]} - {end.day} {SHORT_MONTHS[end.month - 1]}')
+    return f'Vuestro Friends Wrapped ya esta listo ({span})'
+
+
+def notice_message(monday, end, url):
+    """Plain text (SNS email does not render HTML). No listening details: those stay behind login."""
+    return (f'¡Hola! 👋\n\n'
+            f'Ya está listo el Friends Wrapped del grupo 🎧\n'
+            f'📅 Semana del {week_label(monday, end)}\n\n'
+            f'¿Quién ha escuchado más? ¿Qué canción se os ha quedado pegada? 👀\n'
+            f'Lo tenéis todo en el resumen de la semana.\n\n'
+            f'👉 Entra aquí: {url}\n\n'
+            f'Inicia sesión con tu cuenta del grupo y pulsa «Descargar Wrapped en PDF».\n\n'
+            f'¡Nos escuchamos el lunes que viene! 💚\n'
+            f'— Friends Wrapped')
+
+
 def sns_client():
     return boto3.client('sns', config=Config(connect_timeout=5, read_timeout=10,
                         retries={'mode': 'standard', 'max_attempts': 2}))
@@ -60,10 +91,8 @@ def notify(manifest, owner=None):
     try:
         result = sns_client().publish(
             TopicArn=topic,
-            Subject=f'Friends Wrapped disponible: {monday:%d/%m} - {end:%d/%m}',
-            Message=f'El Wrapped del grupo del {monday:%d/%m/%Y} al {end:%d/%m/%Y} ya está disponible.\n\n'
-                    f'Entra en {url}\n\nInicia sesión y pulsa «Descargar Wrapped en PDF».\n'
-                    'Necesitarás tu cuenta del grupo para descargarlo.')
+            Subject=notice_subject(monday, end),
+            Message=notice_message(monday, end, url))
     except Exception:
         # Leave a retryable record. A network timeout can still mean SNS accepted the
         # publish: standard SNS + DynamoDB cannot guarantee exactly-once email delivery.

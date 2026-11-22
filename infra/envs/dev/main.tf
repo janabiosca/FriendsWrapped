@@ -3,7 +3,7 @@
 module "ingestion" {
   source = "../../modules/ingestion"
 
-  existing_raw_bucket  = "sfw-dev-raw-6e5880d28f5d8e514bf6ee4650"
+  existing_raw_bucket  = var.existing_raw_bucket
   name                 = "sfw-dev"
   spotify_client_id    = var.spotify_client_id
   alarm_email          = var.alarm_email

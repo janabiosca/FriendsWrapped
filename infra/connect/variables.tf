@@ -23,3 +23,9 @@ variable "alarm_topic_arn" {
   description = "Existing ingestion SNS topic for operational alarms."
   type        = string
 }
+
+variable "admin_name" {
+  description = "Name shown to members when they must contact the group administrator"
+  type        = string
+  default     = "la administradora del grupo"
+}

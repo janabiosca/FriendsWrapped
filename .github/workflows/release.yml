@@ -24,7 +24,13 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       TF_VAR_spotify_client_id: ${{ vars.SPOTIFY_CLIENT_ID }}
       TF_VAR_concerts_enabled: ${{ vars.CONCERTS_ENABLED || 'false' }}
+      TF_VAR_wrapped_notice_emails: ${{ secrets.WRAPPED_NOTICE_EMAILS || '[]' }}
+      TF_VAR_scheduler_dlq_enabled: ${{ vars.SCHEDULER_DLQ_ENABLED || 'false' }}
       TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+      TF_VAR_existing_raw_bucket: ${{ vars.RAW_BUCKET_NAME }}
+      TF_VAR_listener_ids: ${{ vars.LISTENER_IDS }}
+      TF_VAR_admin_name: ${{ vars.ADMIN_NAME || 'la administradora del grupo' }}
+      TF_VAR_collect_schedule: ${{ vars.COLLECT_SCHEDULE || 'rate(1 hour)' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -74,6 +80,10 @@ jobs:
           export TF_VAR_group_id="$(terraform -chdir=infra/envs/$TF_ENV output -raw group_id)"
           export TF_VAR_alarm_topic_arn="$(terraform -chdir=infra/envs/$TF_ENV output -raw alarm_topic_arn)"
           for stack in connect dashboard wrapped analytics concerts; do
+            # Ticketmaster is not activated: leave the concerts stack untouched unless enabled.
+            if [ "$stack" = "concerts" ] && [ "$TF_VAR_concerts_enabled" != "true" ]; then
+              echo "Skipping concerts (CONCERTS_ENABLED is not true)"; continue
+            fi
             state_name="$stack"
             if [ "$stack" = "connect" ]; then state_name="spotify-connect"; fi
             terraform -chdir=infra/$stack init -input=false \

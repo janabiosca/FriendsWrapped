@@ -81,7 +81,7 @@ def collect(user_id):
     new_plays = sum(store.put_play(user_id, play) for play in plays.values())
     possible_gap = cursor > 0 and full_page
     newest = max((played_at_ms(p["played_at"]) for p in plays.values()), default=cursor)
-    store.record_sync(user_id, max(cursor, newest), new_plays, possible_gap)
+    store.record_sync(user_id, max(cursor, newest), possible_gap)
     return {"user_id": user_id, "fetched": len(plays), "new_plays": new_plays,
             "pages": len(pages), "possible_gap": possible_gap}
 

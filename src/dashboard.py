@@ -74,7 +74,8 @@ def member_from_request(event):
 
 def public_page():
     config = {'clientId': os.environ['COGNITO_CLIENT_ID'],
-              'domain': os.environ['COGNITO_DOMAIN'], 'redirectUri': os.environ['DASHBOARD_URL']}
+              'domain': os.environ['COGNITO_DOMAIN'], 'redirectUri': os.environ['DASHBOARD_URL'],
+              'adminName': os.environ.get('ADMIN_NAME', 'la administradora del grupo')}
     body = (Path(__file__).parent / 'index.html').read_text().replace(
         'const hostedConfig = null;', 'const hostedConfig = ' + json.dumps(config) + ';')
     return {'statusCode': 200, 'headers': {

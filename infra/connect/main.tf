@@ -85,6 +85,7 @@ resource "aws_lambda_function" "connect" {
       GROUP_ID          = var.group_id
       SPOTIFY_CLIENT_ID = var.spotify_client_id
       CONNECT_BASE_URL  = aws_apigatewayv2_api.connect.api_endpoint
+      ADMIN_NAME        = var.admin_name
     }
   }
   depends_on = [aws_cloudwatch_log_group.connect]

@@ -91,13 +91,13 @@ def plays_between(user_id, start_iso, end_iso):
 
 # --- sync state --------------------------------------------------------------
 
-def record_sync(user_id, cursor_ms, new_plays, possible_gap):
+def record_sync(user_id, cursor_ms, possible_gap):
     _table().update_item(
         Key={"PK": f"USER#{user_id}", "SK": "PROFILE"},
         UpdateExpression="SET cursor_ms = :c, last_sync_at = :t, last_sync_status = :ok "
-                         "REMOVE last_error ADD total_plays :n, possible_gaps :g",
+                         "REMOVE last_error, total_plays ADD possible_gaps :g",
         ExpressionAttributeValues={":c": cursor_ms, ":t": _now(), ":ok": "ok",
-                                   ":n": new_plays, ":g": 1 if possible_gap else 0},
+                                   ":g": 1 if possible_gap else 0},
     )
 
 

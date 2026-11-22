@@ -171,6 +171,7 @@ resource "aws_lambda_function" "dashboard" {
       COGNITO_DOMAIN    = "https://${aws_cognito_user_pool_domain.web.domain}.auth.${var.aws_region}.amazoncognito.com"
       COGNITO_CLIENT_ID = aws_cognito_user_pool_client.web.id
       DASHBOARD_URL     = "${aws_apigatewayv2_api.dashboard.api_endpoint}/"
+      ADMIN_NAME        = var.admin_name
     }
   }
   depends_on = [aws_cloudwatch_log_group.dashboard]

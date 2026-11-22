@@ -19,6 +19,10 @@ import store
 SCOPES = "user-read-recently-played user-top-read"
 
 
+def admin():
+    return os.environ.get("ADMIN_NAME", "la administradora del grupo")
+
+
 class InvalidLink(Exception):
     pass
 
@@ -111,7 +115,7 @@ def callback(event, params):
         return page("Spotify no ha completado la autorización. Pide una nueva invitación.", 400)
     existing = store.get_profile(member["user_id"])
     if existing and existing.get("spotify_account_id") != account:
-        return page("Esta integrante ya tiene otra cuenta conectada. Contacta con Jana.", 409)
+        return page(f"Esta integrante ya tiene otra cuenta conectada. Contacta con {admin()}.", 409)
     # A single Spotify account cannot become two members. The reservation survives retries.
     table().update_item(
         Key={"id": "ACCOUNT#" + digest(account)},
@@ -158,7 +162,7 @@ def handler(event, context):
                         "para compartir tus estadísticas de música con el grupo. "
                         "Comprueba la cuenta que aparece en Spotify antes de aceptar.",
                         link="/start?" + urllib.parse.urlencode({"invite": params["invite"]}))
-        return page("Abre la invitación personal que te ha enviado Jana.", 404)
+        return page(f"Abre la invitación personal que te ha enviado {admin()}.", 404)
     except InvalidLink:
         return page("El enlace ha caducado o ya se ha utilizado. Pide una nueva invitación.", 400)
     except ClientError as error:
@@ -166,8 +170,8 @@ def handler(event, context):
         code = error.response["Error"]["Code"]
         print(json.dumps({"event": "connect_aws_error", "code": code}))
         if code == "ConditionalCheckFailedException":
-            return page("La conexión ya se ha utilizado o la cuenta ya está vinculada. Contacta con Jana.", 409)
-        return page("No se ha podido guardar la conexión. Contacta con Jana para volver a intentarlo.", 503)
+            return page(f"La conexión ya se ha utilizado o la cuenta ya está vinculada. Contacta con {admin()}.", 409)
+        return page(f"No se ha podido guardar la conexión. Contacta con {admin()} para volver a intentarlo.", 503)
     except (spotify.SpotifyError, KeyError, ValueError, TypeError, OSError):
         print(json.dumps({"event": "connect_spotify_error"}))
-        return page("Spotify no ha completado la conexión. Contacta con Jana para volver a intentarlo.", 502)
+        return page(f"Spotify no ha completado la conexión. Contacta con {admin()} para volver a intentarlo.", 502)
