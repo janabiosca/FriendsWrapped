@@ -160,7 +160,7 @@ resource "aws_sqs_queue" "scheduler_dlq" {
 
 resource "aws_scheduler_schedule" "wrapped" {
   name                         = "${var.name_prefix}-weekly-wrapped"
-  schedule_expression          = "cron(0 9 ? * MON *)"
+  schedule_expression          = "cron(0 12 ? * MON *)"
   schedule_expression_timezone = "Europe/Madrid"
   flexible_time_window {
     mode = "OFF"

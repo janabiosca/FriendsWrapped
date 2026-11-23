@@ -258,7 +258,7 @@ selector allows every group member to view the group's individual listening summ
 ## Weekly Wrapped generation
 
 `infra/wrapped` deploys a Standard Step Functions workflow and an EventBridge
-Scheduler schedule for Mondays at 09:00 Europe/Madrid. Each run summarizes the
+Scheduler schedule for Mondays at 12:00 Europe/Madrid. Each run summarizes the
 previous complete Monday–Sunday week, then archives HTML and PDF reports in the private
 raw bucket under `wrapped/group=<group>/week=<monday>/`. The workflow passes only
 object references between tasks. Conditional writes preserve the original snapshot
